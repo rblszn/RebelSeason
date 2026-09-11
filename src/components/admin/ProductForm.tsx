@@ -168,26 +168,24 @@ export default function ProductForm({ initialData, categories }: ProductFormProp
               name="name"
               required
               value={formData.name}
-              onChange={handleChange}
-              onBlur={!formData.slug ? generateSlug : undefined}
+              onChange={(e) => {
+                const name = e.target.value;
+                const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+                setFormData(prev => ({ ...prev, name, slug }));
+              }}
               className="w-full p-2 border border-gray-300 rounded-md focus:ring-black focus:border-black"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                name="slug"
-                required
-                value={formData.slug}
-                onChange={handleChange}
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-black focus:border-black"
-              />
-              <button type="button" onClick={generateSlug} className="px-3 bg-gray-100 border border-gray-300 rounded-md text-sm hover:bg-gray-200">
-                Generate
-              </button>
-            </div>
+            <input
+              type="text"
+              name="slug"
+              required
+              value={formData.slug}
+              onChange={handleChange}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-black focus:border-black"
+            />
           </div>
           
           <div>

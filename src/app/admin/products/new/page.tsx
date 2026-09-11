@@ -1,6 +1,8 @@
 import ProductForm from "@/components/admin/ProductForm";
 import { getAllCategories } from "@/lib/dal/categories";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewProductPage() {
   const categories = await getAllCategories();
 
@@ -11,7 +13,7 @@ export default async function NewProductPage() {
         <p className="text-gray-500 mt-1">Create a new product in your store.</p>
       </div>
 
-      <ProductForm categories={categories} />
+      <ProductForm categories={categories.map(c => ({ id: c.id, name: c.name }))} />
     </div>
   );
 }

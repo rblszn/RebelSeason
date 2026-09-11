@@ -22,7 +22,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         <p className="text-gray-500 mt-1">Update product details for {product.name}.</p>
       </div>
 
-      <ProductForm initialData={product} categories={categories} />
+      <ProductForm initialData={product} categories={categories.map(c => ({ id: c.id, name: c.name }))} />
     </div>
   );
 }

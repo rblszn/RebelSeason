@@ -1,6 +1,8 @@
 import { getAllCustomers } from "@/lib/dal/users";
 import { format } from "date-fns";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Customers | Admin",
 };

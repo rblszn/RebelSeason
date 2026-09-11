@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { format } from "date-fns";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Orders | Admin",
 };

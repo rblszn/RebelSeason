@@ -4,6 +4,8 @@ import { getAllProducts } from "@/lib/dal/products";
 import Image from "next/image";
 import { ProductActions } from "./ProductActions";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminProductsPage() {
   const products = await getAllProducts();
 
