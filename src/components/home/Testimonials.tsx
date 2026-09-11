@@ -1,51 +1,44 @@
-﻿"use client";
+import { Star } from "lucide-react";
+import { VideoPlayer } from "@/components/ui/VideoPlayer";
 
 export function Testimonials({ settings }: { settings?: Record<string, string> }) {
-  const rawImages = [
-    settings?.test1_image,
-    settings?.test2_image,
-    settings?.test3_image,
-    settings?.test4_image,
-    settings?.test5_image,
-    settings?.test6_image,
-  ];
-  const customerImages = rawImages.filter(Boolean);
+  let testimonials: string[] = [];
+  try {
+    if (settings?.testimonials_array) testimonials = JSON.parse(settings.testimonials_array);
+  } catch(e) {}
   
-  if (customerImages.length === 0) return null;
+  if (testimonials.length === 0) return null;
 
   return (
-    <section className="py-20 lg:py-24 bg-secondary/30 overflow-hidden">
+    <section className="py-20 lg:py-32 bg-[#F9F9F9] overflow-hidden">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="text-center mb-12 sm:mb-16">
-          <div className="flex items-center justify-center gap-4 mb-4">
-            <div className="h-[1px] w-12 bg-foreground/20" />
-            <span className="text-[11px] font-semibold tracking-[0.2em] uppercase text-foreground/70">
-              Happy Customers
-            </span>
-            <div className="h-[1px] w-12 bg-foreground/20" />
+        <div className="flex flex-col items-center text-center mb-16 lg:mb-24">
+          <div className="flex gap-1 mb-6">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star key={star} className="w-5 h-5 fill-black text-black" />
+            ))}
           </div>
-          <h2 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-normal text-foreground mb-3">
-            Customer <span className="text-primary italic">Love</span>
+          <h2 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-normal text-foreground leading-tight max-w-3xl">
+            Loved by Rebels <br className="hidden sm:block" />
+            <span className="text-foreground/50">Everywhere.</span>
           </h2>
-          <p className="text-muted-foreground text-sm sm:text-base">
-            Real feedback from our Instagram community
-          </p>
         </div>
 
-        {/* Grid for Customer Images (matching screenshot) */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
-          {customerImages.map((img, i) => (
+        <div className="flex overflow-x-auto gap-4 sm:gap-6 pb-8 snap-x snap-mandatory scrollbar-hide">
+          {testimonials.map((url, i) => (
             <div 
               key={i}
-              className="relative w-full aspect-[9/16] rounded-[24px] overflow-hidden block bg-background shadow-sm hover:scale-105 transition-transform duration-500"
+              className="relative w-[300px] sm:w-[350px] aspect-[4/5] rounded-[24px] overflow-hidden flex-shrink-0 snap-center group shadow-sm"
             >
-              <div 
-                className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url('${img}')` }}
-              />
-              {/* Optional slight dark gradient to simulate the vibe of a screenshot */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+              {url.match(/\.(mp4|webm|ogg)$/i) ? (
+                <VideoPlayer url={url} className="w-full h-full" />
+              ) : (
+                <div 
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+                  style={{ backgroundImage: `url('${url}')` }}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -54,5 +47,3 @@ export function Testimonials({ settings }: { settings?: Record<string, string> }
     </section>
   );
 }
-
-

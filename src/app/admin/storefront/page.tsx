@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function StorefrontSettings() {
@@ -9,51 +9,88 @@ export default function StorefrontSettings() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
+  
+  const [reels, setReels] = useState<string[]>([]);
+  const [testimonials, setTestimonials] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/api/admin/settings")
       .then((res) => res.json())
       .then((data) => {
         setSettings(data);
+        try {
+          if (data.reels_array) setReels(JSON.parse(data.reels_array));
+          if (data.testimonials_array) setTestimonials(JSON.parse(data.testimonials_array));
+        } catch(e) {}
         setLoading(false);
       });
   }, []);
 
-  const handleChange = (key: string, value: string) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, key: string) => {
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'reels' | 'testimonials') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploading(key);
-    const form = new FormData();
-    form.append("file", file);
+    setUploading(type);
 
     try {
-      const res = await fetch("/api/admin/upload", {
+      // 1. Get Signature
+      const sigRes = await fetch("/api/admin/cloudinary-signature");
+      if (!sigRes.ok) throw new Error("Signature failed");
+      const { signature, timestamp, cloudName, apiKey } = await sigRes.json();
+
+      // 2. Upload direct to Cloudinary
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("api_key", apiKey);
+      formData.append("timestamp", timestamp.toString());
+      formData.append("signature", signature);
+      formData.append("folder", "rebel-season/storefront");
+
+      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
         method: "POST",
-        body: form,
+        body: formData,
       });
-      const data = await res.json();
-      if (data.url) {
-        handleChange(key, data.url);
+      
+      const data = await uploadRes.json();
+      if (!data.secure_url) {
+        console.error("Cloudinary Error Details:", data);
+        throw new Error(data.error?.message || "Upload failed");
+      }
+
+      if (type === 'reels') {
+        setReels(prev => [...prev, data.secure_url]);
+      } else {
+        setTestimonials(prev => [...prev, data.secure_url]);
       }
     } catch (err) {
-      alert("Upload failed");
+      console.error(err);
+      alert("Upload failed. Make sure the file is not corrupted.");
     } finally {
       setUploading(null);
+    }
+  };
+
+  const removeMedia = (index: number, type: 'reels' | 'testimonials') => {
+    if (type === 'reels') {
+      setReels(prev => prev.filter((_, i) => i !== index));
+    } else {
+      setTestimonials(prev => prev.filter((_, i) => i !== index));
     }
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const payload = {
+        ...settings,
+        reels_array: JSON.stringify(reels),
+        testimonials_array: JSON.stringify(testimonials)
+      };
+      
       const res = await fetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       });
       if (res.ok) alert("Settings saved!");
       else alert("Failed to save.");
@@ -66,19 +103,28 @@ export default function StorefrontSettings() {
 
   if (loading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-gray-500" /></div>;
 
-  const renderMediaInput = (key: string, label: string) => (
-    <div className="border border-gray-200 p-4 rounded-md bg-gray-50 flex flex-col items-center gap-3">
-      <span className="text-sm font-medium">{label}</span>
-      {settings[key] ? (
-        <img src={settings[key]} alt="Preview" className="w-24 h-32 object-cover rounded-md border shadow-sm" />
-      ) : (
-        <div className="w-24 h-32 bg-gray-200 rounded-md flex items-center justify-center text-xs text-gray-400">None</div>
-      )}
+  const renderMediaGrid = (items: string[], type: 'reels' | 'testimonials') => (
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      {items.map((url, i) => (
+        <div key={i} className="relative border border-gray-200 rounded-md bg-gray-50 aspect-[9/16] overflow-hidden group">
+          {url.match(/\.(mp4|webm|ogg)$/i) ? (
+            <video src={url} className="w-full h-full object-cover" autoPlay loop muted playsInline />
+          ) : (
+            <img src={url} className="w-full h-full object-cover" alt="Media" />
+          )}
+          <button 
+            onClick={() => removeMedia(i, type)}
+            className="absolute top-2 right-2 bg-white/80 p-1.5 rounded-full text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ))}
       
-      <label className="cursor-pointer bg-white border border-gray-300 text-sm px-3 py-1.5 rounded-md hover:bg-gray-100 transition-colors w-full text-center flex items-center justify-center gap-2">
-        {uploading === key ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-        Upload
-        <input type="file" className="hidden" accept="image/*,video/*" onChange={(e) => handleMediaUpload(e, key)} disabled={uploading === key} />
+      <label className="cursor-pointer border-2 border-dashed border-gray-300 rounded-md bg-gray-50 aspect-[9/16] flex flex-col items-center justify-center hover:bg-gray-100 transition-colors">
+        {uploading === type ? <Loader2 size={24} className="animate-spin text-gray-400" /> : <Plus size={24} className="text-gray-400" />}
+        <span className="text-sm font-medium text-gray-500 mt-2">Add {type === 'reels' ? 'Reel' : 'Image'}</span>
+        <input type="file" className="hidden" accept="image/*,video/*" onChange={(e) => handleMediaUpload(e, type)} disabled={uploading !== null} />
       </label>
     </div>
   );
@@ -95,26 +141,12 @@ export default function StorefrontSettings() {
       <div className="space-y-8">
         <div className="bg-white p-6 rounded-lg border shadow-sm">
           <h2 className="text-xl font-semibold mb-4 border-b pb-2">Reels Section Media</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {renderMediaInput("reel1_image", "Reel 1")}
-            {renderMediaInput("reel2_image", "Reel 2")}
-            {renderMediaInput("reel3_image", "Reel 3")}
-            {renderMediaInput("reel4_image", "Reel 4")}
-            {renderMediaInput("reel5_image", "Reel 5")}
-            {renderMediaInput("reel6_image", "Reel 6")}
-          </div>
+          {renderMediaGrid(reels, 'reels')}
         </div>
 
         <div className="bg-white p-6 rounded-lg border shadow-sm">
           <h2 className="text-xl font-semibold mb-4 border-b pb-2">Testimonials Section Media</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {renderMediaInput("test1_image", "Testimonial 1")}
-            {renderMediaInput("test2_image", "Testimonial 2")}
-            {renderMediaInput("test3_image", "Testimonial 3")}
-            {renderMediaInput("test4_image", "Testimonial 4")}
-            {renderMediaInput("test5_image", "Testimonial 5")}
-            {renderMediaInput("test6_image", "Testimonial 6")}
-          </div>
+          {renderMediaGrid(testimonials, 'testimonials')}
         </div>
       </div>
     </div>

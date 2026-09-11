@@ -1,17 +1,10 @@
-﻿"use client";
-
-import { Play } from "lucide-react";
+import { VideoPlayer } from "@/components/ui/VideoPlayer";
 
 export function ReelsCarousel({ settings }: { settings?: Record<string, string> }) {
-  const rawReels = [
-    { id: 1, image: settings?.reel1_image, link: "https://www.instagram.com/rebel_seasonn/" },
-    { id: 2, image: settings?.reel2_image, link: "https://www.instagram.com/rebel_seasonn/" },
-    { id: 3, image: settings?.reel3_image, link: "https://www.instagram.com/rebel_seasonn/" },
-    { id: 4, image: settings?.reel4_image, link: "https://www.instagram.com/rebel_seasonn/" },
-    { id: 5, image: settings?.reel5_image, link: "https://www.instagram.com/rebel_seasonn/" },
-    { id: 6, image: settings?.reel6_image, link: "https://www.instagram.com/rebel_seasonn/" },
-  ];
-  const reels = rawReels.filter(r => r.image);
+  let reels: string[] = [];
+  try {
+    if (settings?.reels_array) reels = JSON.parse(settings.reels_array);
+  } catch(e) {}
   
   if (reels.length === 0) return null;
 
@@ -32,29 +25,22 @@ export function ReelsCarousel({ settings }: { settings?: Record<string, string> 
           </h2>
         </div>
 
-        {/* Static Grid for Reels (matching the screenshot exactly) */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
-          {reels.map((reel) => (
-            <a 
-              key={reel.id}
-              href={reel.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="relative w-full aspect-[9/16] rounded-[24px] overflow-hidden group block bg-secondary shadow-sm"
+        <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-8 snap-x snap-mandatory scrollbar-hide">
+          {reels.map((url, i) => (
+            <div 
+              key={i}
+              className="relative w-[240px] sm:w-[280px] lg:w-[320px] aspect-[9/16] rounded-[24px] overflow-hidden group flex-shrink-0 snap-center bg-secondary shadow-sm"
             >
-              <div 
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-105"
-                style={{ backgroundImage: `url('${reel.image}')` }}
-              />
-              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300" />
-              
-              {/* Play Button Icon */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-14 h-14 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-300 group-hover:scale-110">
-                  <Play className="w-6 h-6 ml-1 fill-white" />
-                </div>
-              </div>
-            </a>
+              {url.match(/\.(mp4|webm|ogg)$/i) ? (
+                <VideoPlayer url={url} className="w-full h-full" />
+              ) : (
+                <div 
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-105"
+                  style={{ backgroundImage: `url('${url}')` }}
+                />
+              )}
+              <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-300 pointer-events-none" />
+            </div>
           ))}
         </div>
 
@@ -62,6 +48,3 @@ export function ReelsCarousel({ settings }: { settings?: Record<string, string> 
     </section>
   );
 }
-
-
-
