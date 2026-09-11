@@ -1,4 +1,4 @@
-﻿import { v2 as cloudinary } from "cloudinary";
+import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -15,10 +15,7 @@ export async function uploadImage(
       .upload_stream(
         {
           folder,
-          resource_type: "image",
-          transformation: [
-            { width: 1200, height: 1600, crop: "limit", quality: "auto:good", fetch_format: "auto" },
-          ],
+          resource_type: "auto",
         },
         (error, result) => {
           if (error || !result) {
