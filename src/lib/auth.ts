@@ -1,4 +1,4 @@
-﻿import { SessionOptions, getIronSession } from "iron-session";
+import { SessionOptions, getIronSession } from "iron-session";
 import { cookies } from "next/headers";
 
 export interface SessionData {
@@ -7,7 +7,7 @@ export interface SessionData {
   name: string;
   role: "CUSTOMER" | "ADMIN";
   pendingOtp?: string;
-  pendingUser?: { name: string; email: string; passwordHash: string };
+  pendingUser?: { name: string; email: string; phone?: string; passwordHash: string };
   isLoggedIn: boolean;
 }
 

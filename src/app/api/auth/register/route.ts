@@ -35,6 +35,7 @@ export async function POST(request: Request) {
         data: {
           name: session.pendingUser.name,
           email: session.pendingUser.email,
+          phone: session.pendingUser.phone,
           password: session.pendingUser.passwordHash,
           role: "CUSTOMER",
         },
@@ -58,10 +59,10 @@ export async function POST(request: Request) {
     }
 
     // Initial Flow: SEND OTP
-    const { name, email, password } = body;
+    const { name, email, phone, password } = body;
 
-    if (!name || !email || !password) {
-      return NextResponse.json({ error: "Name, email and password are required" }, { status: 400 });
+    if (!name || !email || !password || !phone) {
+      return NextResponse.json({ error: "Name, email, phone, and password are required" }, { status: 400 });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
     session.pendingUser = {
       name: name.trim(),
       email: normalizedEmail,
+      phone: phone.trim(),
       passwordHash: hashedPassword,
     };
     await session.save();

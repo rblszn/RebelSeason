@@ -25,11 +25,11 @@ export function Testimonials({ settings }: { settings?: Record<string, string> }
           </h2>
         </div>
 
-        <div className="flex overflow-x-auto gap-4 sm:gap-6 pb-8 snap-x snap-mandatory scrollbar-hide">
+        <div className="flex overflow-x-auto gap-4 sm:gap-6 pb-8 snap-x snap-mandatory scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {testimonials.map((url, i) => (
             <div 
               key={i}
-              className="relative w-[300px] sm:w-[350px] aspect-[4/5] rounded-[24px] overflow-hidden flex-shrink-0 snap-center group shadow-sm"
+              className="relative w-[220px] sm:w-[260px] lg:w-[300px] aspect-[4/5] rounded-[24px] overflow-hidden flex-shrink-0 snap-center group shadow-sm"
             >
               {url.match(/\.(mp4|webm|ogg)$/i) ? (
                 <VideoPlayer url={url} className="w-full h-full" />

@@ -4,6 +4,7 @@ import { ChevronRight, Plus, Minus } from "lucide-react";
 import Link from "next/link";
 import { ProductCard } from "@/components/product/ProductCard";
 import { getProductBySlug, getProductsByCategory } from "@/lib/dal/products";
+import { ProductClient } from "@/components/store/ProductClient";
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
@@ -17,6 +18,24 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const relatedProducts = (await getProductsByCategory(product.category.slug)).filter(p => p.id !== product.id).slice(0, 4);
 
   const isOnSale = product.originalPrice && product.originalPrice > product.price;
+
+  const serializedProduct = {
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    price: Number(product.price),
+    originalPrice: product.originalPrice ? Number(product.originalPrice) : null,
+    images: product.images,
+    description: product.description,
+    material: product.material,
+    careInstructions: product.careInstructions,
+    hasVariants: product.hasVariants,
+    variants: product.variants.map(v => ({
+      id: v.id,
+      size: v.size,
+      stock: v.stock
+    }))
+  };
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
@@ -74,73 +93,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             )}
           </div>
 
-          <div className="space-y-8 mb-10">
-            {/* Size Selection */}
-            {product.hasVariants && product.variants && product.variants.length > 0 && (
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-[11px] font-semibold tracking-[0.1em] uppercase">Size</span>
-                  <Link href="#" className="text-[11px] font-medium tracking-[0.1em] text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors">Size Guide</Link>
-                </div>
-                <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
-                  {product.variants.map((variant) => (
-                    <button 
-                      key={variant.id} 
-                      disabled={variant.stock === 0}
-                      className={`h-12 text-[13px] font-medium border transition-colors ${variant.stock === 0 ? 'border-border text-muted-foreground opacity-50 cursor-not-allowed bg-secondary/50 line-through' : 'border-border text-foreground hover:border-foreground'}`}
-                    >
-                      {variant.size}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Quantity */}
-            <div>
-              <span className="text-[11px] font-semibold tracking-[0.1em] uppercase mb-3 block">Quantity</span>
-              <div className="flex items-center border border-border w-32 h-12">
-                <button className="flex-1 flex justify-center items-center text-muted-foreground hover:text-foreground transition-colors">
-                  <Minus className="w-4 h-4 stroke-[1.5]" />
-                </button>
-                <span className="flex-1 text-center text-[13px] font-medium">1</span>
-                <button className="flex-1 flex justify-center items-center text-muted-foreground hover:text-foreground transition-colors">
-                  <Plus className="w-4 h-4 stroke-[1.5]" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <Button className="w-full h-14 rounded-none font-semibold uppercase tracking-[0.2em] text-[11px] mb-4 bg-foreground text-background hover:bg-foreground/90">
-            Add to Cart
-          </Button>
-          
-          <Button variant="outline" className="w-full h-14 rounded-none font-semibold uppercase tracking-[0.2em] text-[11px] bg-transparent border-foreground text-foreground hover:bg-foreground hover:text-background transition-colors mb-12">
-            Buy it Now
-          </Button>
-
-          {/* Description Accordions */}
-          <div className="border-t border-border pt-8 space-y-6 text-[14px] font-light text-muted-foreground leading-relaxed">
-            <p>
-              {product.description || `The ${product.name} is a versatile essential for your modern wardrobe. Designed with a relaxed fit and premium materials to ensure comfort without compromising on style. The clean lines and subtle details make it perfect for any occasion.`}
-            </p>
-            {product.material && (
-              <p>
-                <strong>Material:</strong> {product.material}
-              </p>
-            )}
-            {product.careInstructions && (
-              <p>
-                <strong>Care:</strong> {product.careInstructions}
-              </p>
-            )}
-            <div className="border-b border-border pb-4">
-              <button className="flex justify-between items-center w-full text-foreground text-[13px] font-semibold tracking-[0.1em] uppercase py-2">
-                Shipping & Returns
-                <Plus className="w-4 h-4 stroke-[1.5]" />
-              </button>
-            </div>
-          </div>
+          <ProductClient product={serializedProduct} />
 
         </div>
       </div>

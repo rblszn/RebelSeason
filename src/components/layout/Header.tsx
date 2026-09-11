@@ -1,14 +1,17 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Search, User, ShoppingBag, Menu, X } from "lucide-react";
+import { useCart } from "@/lib/cart-context";
 
 export function Header({ user }: { user?: { name: string } | null }) {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { getItemCount } = useCart();
+  const itemCount = getItemCount();
 
   return (
     <div className="w-full flex flex-col relative z-50">
@@ -77,6 +80,11 @@ export function Header({ user }: { user?: { name: string } | null }) {
               </Link>
               <Link href="/cart" className="text-foreground hover:text-muted-foreground transition-colors relative">
                 <ShoppingBag className="w-5 h-5 stroke-[1.5]" />
+                {itemCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                    {itemCount > 99 ? "99+" : itemCount}
+                  </span>
+                )}
                 <span className="sr-only">Cart</span>
               </Link>
             </div>

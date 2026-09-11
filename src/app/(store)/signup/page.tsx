@@ -18,6 +18,7 @@ export default function SignupPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    phone: "",
     password: "",
   });
 
@@ -115,6 +116,18 @@ export default function SignupPage() {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full p-2.5 border border-border rounded-md focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all"
                 placeholder="jane@example.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Phone Number</label>
+              <input
+                type="tel"
+                required
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full p-2.5 border border-border rounded-md focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all"
+                placeholder="+91 98765 43210"
               />
             </div>
 

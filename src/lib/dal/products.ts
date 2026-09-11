@@ -108,7 +108,6 @@ export async function getNewArrivals(
   limit?: number
 ): Promise<ProductWithRelations[]> {
   return prisma.product.findMany({
-    where: { isNew: true },
     include: productInclude,
     orderBy: { createdAt: "desc" },
     ...(limit !== undefined ? { take: limit } : {}),
