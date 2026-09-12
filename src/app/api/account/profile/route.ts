@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getCustomerSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
+
 export async function PUT(request: Request) {
   const session = await getCustomerSession();
   if (!session.isLoggedIn || !session.userId) {

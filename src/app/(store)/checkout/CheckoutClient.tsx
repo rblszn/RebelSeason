@@ -27,21 +27,16 @@ export default function CheckoutClient({ session }: { session: any }) {
     pincode: ""
   });
 
-  useEffect(() => {
-    if (items.length === 0) {
-      router.push("/cart");
-    }
-  }, [items, router]);
 
   useEffect(() => {
     if (session.isLoggedIn) {
       fetch("/api/account/addresses")
         .then(res => res.json())
         .then(data => {
-          if (data && data.addresses) {
-            setAddresses(data.addresses);
-            if (data.addresses.length > 0) {
-              setSelectedAddressId(data.addresses[0].id);
+          if (Array.isArray(data)) {
+            setAddresses(data);
+            if (data.length > 0) {
+              setSelectedAddressId(data[0].id);
             } else {
               setShowNewAddress(true);
             }
@@ -155,7 +150,7 @@ export default function CheckoutClient({ session }: { session: any }) {
     }
   };
 
-  if (items.length === 0) return null;
+  if (items.length === 0) return <div className="text-center py-20">Your cart is empty. <Link href="/products" className="underline">Go shopping</Link></div>;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full flex-1">
@@ -172,13 +167,15 @@ export default function CheckoutClient({ session }: { session: any }) {
 
           <form onSubmit={handlePlaceOrder} className="space-y-10">
             {/* Contact */}
-            <section>
-              <h2 className="text-lg font-medium mb-4">Contact Information</h2>
-              <div className="space-y-4">
-                <Input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} readOnly={session.isLoggedIn} required className="w-full h-12 rounded-none bg-secondary/50 border-border" />
-                <Input type="tel" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} required className="w-full h-12 rounded-none bg-secondary/50 border-border" />
-              </div>
-            </section>
+            {!session.isLoggedIn && (
+              <section>
+                <h2 className="text-lg font-medium mb-4">Contact Information</h2>
+                <div className="space-y-4">
+                  <Input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-12 rounded-none bg-secondary/50 border-border" />
+                  <Input type="tel" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} required className="w-full h-12 rounded-none bg-secondary/50 border-border" />
+                </div>
+              </section>
+            )}
 
             {/* Shipping */}
             <section>

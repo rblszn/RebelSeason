@@ -39,6 +39,20 @@ export async function POST(req: Request) {
       include: { items: true }
     });
 
+    for (const item of order.items) {
+      if (item.variantId) {
+        await prisma.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { decrement: item.quantity } }
+        });
+      } else if (item.productId) {
+        await prisma.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } }
+        });
+      }
+    }
+
     try {
       await sendOrderConfirmationEmail(order.customerEmail, order);
     } catch (e) {

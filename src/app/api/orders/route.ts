@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { getCustomerSession } from "@/lib/auth";
 import Razorpay from "razorpay";
 
+export const dynamic = "force-dynamic";
+
+
 export async function POST(req: Request) {
   try {
     const session = await getCustomerSession();

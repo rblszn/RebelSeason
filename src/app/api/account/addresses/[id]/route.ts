@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getCustomerSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
+
 export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const id = params.id;
@@ -27,7 +30,7 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
     }
 
     const updatedAddress = await prisma.address.update({
-      where: { id },
+      where: { id, userId: session.userId as string },
       data: {
         ...(name && { name }),
         ...(phone && { phone }),
@@ -61,7 +64,7 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
       return NextResponse.json({ error: "Address not found or unauthorized" }, { status: 404 });
     }
 
-    await prisma.address.delete({ where: { id } });
+    await prisma.address.delete({ where: { id, userId: session.userId as string } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
