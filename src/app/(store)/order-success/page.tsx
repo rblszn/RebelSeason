@@ -2,6 +2,8 @@ import { getOrderById } from '@/lib/dal/orders';
 import OrderSuccessClient from './OrderSuccessClient';
 import { notFound, redirect } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+
 export default async function OrderSuccessPage({
   searchParams,
 }: {

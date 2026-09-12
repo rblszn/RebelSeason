@@ -63,10 +63,10 @@ export default function OrderSuccessClient({ order }: { order: any }) {
               {order.items.map((item: any) => (
                 <div key={item.id} className="flex items-center">
                   <div className="flex-shrink-0 w-16 h-20 bg-gray-100 rounded-md overflow-hidden relative">
-                    {item.product?.images?.[0] ? (
+                    {item.image ? (
                       <Image
-                        src={item.product.images[0]}
-                        alt={item.product?.name || 'Product Image'}
+                        src={item.image}
+                        alt={item.name || 'Product Image'}
                         fill
                         className="object-cover"
                       />
@@ -77,8 +77,8 @@ export default function OrderSuccessClient({ order }: { order: any }) {
                     )}
                   </div>
                   <div className="ml-4 flex-1">
-                    <h3 className="text-sm font-medium text-gray-900">{item.product?.name || "Product"}</h3>
-                    {item.size && <p className="text-sm text-gray-500 mt-1">Size: {item.size}</p>}
+                    <h3 className="text-sm font-medium text-gray-900">{item.name || "Product"}</h3>
+                    {item.variantName && <p className="text-sm text-gray-500 mt-1">Size: {item.variantName}</p>}
                     <p className="text-sm text-gray-500 mt-1">Qty: {item.quantity}</p>
                   </div>
                   <div className="text-right">
@@ -105,18 +105,21 @@ export default function OrderSuccessClient({ order }: { order: any }) {
             </div>
 
             {/* Shipping Address */}
-            {order.shippingAddress && (
-              <div className="mb-10 bg-gray-50 rounded-xl p-6">
-                <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4">Shipping Address</h2>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p className="font-medium text-gray-900">{order.shippingAddress.fullName}</p>
-                  <p>{order.shippingAddress.addressLine1}</p>
-                  {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
-                  <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}</p>
-                  <p className="pt-2 text-gray-500">Phone: {order.shippingAddress.phone}</p>
+            {order.shippingAddress && (() => {
+              const addr = typeof order.shippingAddress === 'string' ? JSON.parse(order.shippingAddress) : order.shippingAddress;
+              return (
+                <div className="mb-10 bg-gray-50 rounded-xl p-6">
+                  <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4">Shipping Address</h2>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p className="font-medium text-gray-900">{addr.name || addr.fullName}</p>
+                    <p>{addr.street || addr.addressLine1}</p>
+                    {addr.addressLine2 && <p>{addr.addressLine2}</p>}
+                    <p>{addr.city}, {addr.state} {addr.pincode || addr.postalCode}</p>
+                    <p className="pt-2 text-gray-500">Phone: {addr.phone}</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">

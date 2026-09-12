@@ -162,9 +162,9 @@ export function AccountClient({ session, orders }: AccountClientProps) {
         >
           Saved Addresses
         </button>
-        <Link href="/api/auth/logout" className="block w-full text-left px-4 py-3 hover:bg-secondary/50 text-[13px] text-red-600/80 mt-4">
+        <a href="/api/auth/logout" className="block w-full text-left px-4 py-3 hover:bg-secondary/50 text-[13px] text-red-600/80 mt-4">
           Log Out
-        </Link>
+        </a>
       </div>
 
       {/* Content */}

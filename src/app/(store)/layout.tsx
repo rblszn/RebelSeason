@@ -3,6 +3,8 @@ import { getCustomerSession } from "@/lib/auth";
 import { Footer } from "@/components/layout/Footer";
 import { CartProvider } from "@/lib/cart-context";
 
+export const dynamic = 'force-dynamic';
+
 export default async function StoreLayout({
   children,
 }: {
