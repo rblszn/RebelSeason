@@ -57,6 +57,17 @@ export default function CheckoutClient({ session }: { session: any }) {
   const shipping = subtotal > 2000 ? 0 : 100;
   const total = subtotal + shipping;
 
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) { resolve(true); return; }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -87,13 +98,59 @@ export default function CheckoutClient({ session }: { session: any }) {
       });
 
       if (!res.ok) throw new Error("Order failed");
+      const data = await res.json();
 
-      clearCart();
-      router.push("/account");
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        alert("Razorpay SDK failed to load");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const options = {
+        key: data.keyId,
+        amount: data.amount,
+        currency: data.currency,
+        name: 'The Rebel Season',
+        description: 'Order Payment',
+        order_id: data.razorpayOrderId,
+        prefill: { email, contact: phone || finalAddress.phone || "" },
+        theme: { color: '#E91E63' },
+        handler: async (response: any) => {
+          // Verify payment
+          const verifyRes = await fetch('/api/orders/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              orderId: data.orderId,
+            }),
+          });
+          if (verifyRes.ok) {
+            clearCart();
+            router.push(`/order-success?id=${data.orderId}`);
+          } else {
+            router.push(`/order-failed?id=${data.orderId}`);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            router.push(`/order-failed?id=${data.orderId}`);
+          }
+        }
+      };
+      
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (response: any) {
+        router.push(`/order-failed?id=${data.orderId}`);
+      });
+      rzp.open();
+
     } catch (error) {
       console.error(error);
       alert("Failed to place order.");
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -165,7 +222,7 @@ export default function CheckoutClient({ session }: { session: any }) {
             </section>
 
             <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-none font-semibold uppercase tracking-widest text-sm bg-foreground text-background hover:bg-foreground/90 transition-colors">
-              {isSubmitting ? "Placing Order..." : "Place Order"}
+              {isSubmitting ? "Processing..." : `Pay Now ₹${total}`}
             </Button>
             
             <div className="text-center mt-6">

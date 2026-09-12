@@ -1,4 +1,4 @@
-﻿import { getOrderById } from "@/lib/dal/orders";
+import { getOrderById } from "@/lib/dal/orders";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -56,7 +56,7 @@ export default async function OrderDetailPage({
                   <div className="flex flex-1 flex-col">
                     <div className="flex justify-between text-sm font-medium text-gray-900">
                       <h3>{item.name}</h3>
-                      <p className="ml-4">₹{(item.price / 100).toLocaleString('en-IN')}</p>
+                      <p className="ml-4">₹{item.price.toLocaleString('en-IN')}</p>
                     </div>
                     <p className="mt-1 text-sm text-gray-500">
                       {item.variantName ? `Size: ${item.variantName}` : "One Size"}
@@ -64,7 +64,7 @@ export default async function OrderDetailPage({
                     <div className="flex flex-1 items-end justify-between text-sm">
                       <p className="text-gray-500">Qty {item.quantity}</p>
                       <p className="font-medium text-gray-900">
-                        ₹{((item.price * item.quantity) / 100).toLocaleString('en-IN')}
+                        ₹{(item.price * item.quantity).toLocaleString('en-IN')}
                       </p>
                     </div>
                   </div>
@@ -74,7 +74,7 @@ export default async function OrderDetailPage({
             <div className="mt-6 pt-6 border-t border-gray-200">
               <div className="flex justify-between text-sm font-medium text-gray-900">
                 <p>Total</p>
-                <p>₹{(order.total / 100).toLocaleString('en-IN')}</p>
+                <p>₹{order.total.toLocaleString('en-IN')}</p>
               </div>
             </div>
           </div>
@@ -112,6 +112,22 @@ export default async function OrderDetailPage({
               </div>
             ) : (
               <p className="text-sm text-gray-500">No shipping address available</p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Tracking Information</h2>
+            {(order as any).trackingUrl ? (
+              <a 
+                href={(order as any).trackingUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline break-all"
+              >
+                {(order as any).trackingUrl}
+              </a>
+            ) : (
+              <p className="text-sm text-gray-500">No tracking information available</p>
             )}
           </div>
           

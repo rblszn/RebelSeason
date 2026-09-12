@@ -156,6 +156,7 @@ model Order {
   customerEmail   String
   customerPhone   String?
   shippingAddress Json
+  trackingUrl     String?
 
   customer User        @relation(fields: [customerId], references: [id])
   items    OrderItem[]

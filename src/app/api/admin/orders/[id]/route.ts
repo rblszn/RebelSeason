@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getOrderById } from "@/lib/dal/orders";
 import { OrderStatus } from "@prisma/client";
+import { sendShippingNotificationEmail } from "@/lib/mail";
 
 export async function GET(
   request: Request,
@@ -29,7 +30,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status } = body as { status: OrderStatus };
+    const { status, trackingUrl } = body as { status: OrderStatus; trackingUrl?: string };
 
     if (!Object.values(OrderStatus).includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
@@ -40,15 +41,24 @@ export async function PUT(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
+    const updateData: any = { status };
+    if (status === "SHIPPED" && trackingUrl) {
+      updateData.trackingUrl = trackingUrl;
+    }
+
     const updatedOrder = await prisma.order.update({
       where: { id },
-      data: { status },
+      data: updateData,
       include: {
         customer: true,
         items: true,
         payment: true,
       },
     });
+
+    if (status === "SHIPPED" && trackingUrl && updatedOrder.customerEmail) {
+      await sendShippingNotificationEmail(updatedOrder.customerEmail, updatedOrder, trackingUrl);
+    }
 
     return NextResponse.json(updatedOrder);
   } catch (error) {
