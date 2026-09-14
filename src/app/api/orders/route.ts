@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCustomerSession } from "@/lib/auth";
 import Razorpay from "razorpay";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    if (!(await checkRateLimit(ip, "checkout", 5, 60000))) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    }
+
     const session = await getCustomerSession();
     const body = await req.json();
     const { items, address, phone, email } = body;

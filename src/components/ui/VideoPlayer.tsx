@@ -40,27 +40,21 @@ export function VideoPlayer({ url, className }: { url: string; className?: strin
       setIsPlaying(false);
     } else {
       setIsWaitingToPlay(true);
+      
+      // If not loaded yet, force the src update immediately bypassing React state delay
+      // to ensure play() is called in the same synchronous click event tick.
       if (!isLoaded) {
-        setIsLoaded(true); // This will trigger the src to be set
-      } else {
-        videoRef.current.play().then(() => {
-          setIsPlaying(true);
-          setIsWaitingToPlay(false);
-          window.dispatchEvent(new CustomEvent("videoplayer-play", { detail: videoId }));
-        });
+        setIsLoaded(true);
+        videoRef.current.src = url;
+        videoRef.current.load();
       }
-    }
-  };
 
-  // Called automatically when video has loaded enough data to play (triggered by setting isLoaded=true)
-  const handleCanPlay = () => {
-    if (isWaitingToPlay && videoRef.current) {
       videoRef.current.play().then(() => {
         setIsPlaying(true);
         setIsWaitingToPlay(false);
         window.dispatchEvent(new CustomEvent("videoplayer-play", { detail: videoId }));
       }).catch((e) => {
-        console.error("Autoplay failed:", e);
+        console.error("Play failed:", e);
         setIsWaitingToPlay(false);
       });
     }
@@ -76,8 +70,6 @@ export function VideoPlayer({ url, className }: { url: string; className?: strin
         loop
         playsInline
         muted
-        onCanPlay={handleCanPlay}
-        onLoadedData={handleCanPlay}
         className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 cursor-pointer"
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}

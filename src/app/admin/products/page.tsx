@@ -65,7 +65,10 @@ export default async function AdminProductsPage() {
                     ₹{product.price.toLocaleString("en-IN")}
                   </td>
                   <td className="p-4 text-gray-600">
-                    {product.stock} {product.hasVariants ? "(Variants)" : ""}
+                    {product.hasVariants 
+                      ? `${product.variants?.reduce((sum, v) => sum + (v.stock || 0), 0) || 0} (Variants)`
+                      : product.stock
+                    }
                   </td>
                   <td className="p-4">
                     <ProductActions productId={product.id} />

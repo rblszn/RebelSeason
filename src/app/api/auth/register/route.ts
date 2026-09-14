@@ -3,11 +3,13 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { getCustomerSession } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/mail";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
     const body = await request.json().catch(() => null);
 
     if (!body || typeof body !== "object") {
@@ -19,6 +21,10 @@ export async function POST(request: Request) {
     // 2. Verify OTP
 
     if (body.action === "verify") {
+      if (!(await checkRateLimit(ip, "otp_verify", 5))) {
+        return NextResponse.json({ error: "Too many verification attempts. Please try again later." }, { status: 429 });
+      }
+      
       const { otp } = body;
       const session = await getCustomerSession();
 
@@ -59,6 +65,10 @@ export async function POST(request: Request) {
     }
 
     // Initial Flow: SEND OTP
+    if (!(await checkRateLimit(ip, "otp_generate", 5))) {
+      return NextResponse.json({ error: "Too many sign up attempts. Please try again later." }, { status: 429 });
+    }
+
     const { name, email, phone, password } = body;
 
     if (!name || !email || !password || !phone) {

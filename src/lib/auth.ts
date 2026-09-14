@@ -8,6 +8,8 @@ export interface SessionData {
   role: "CUSTOMER" | "ADMIN";
   pendingOtp?: string;
   pendingUser?: { name: string; email: string; phone?: string; passwordHash: string };
+  resetEmail?: string;
+  resetOtp?: string;
   isLoggedIn: boolean;
 }
 

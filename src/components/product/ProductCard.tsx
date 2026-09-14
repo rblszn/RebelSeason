@@ -39,6 +39,11 @@ export function ProductCard({ product }: ProductCardProps) {
               Sale
             </span>
           )}
+          {(product.hasVariants ? (product.variants?.reduce((sum, v) => sum + (v.stock || 0), 0) || 0) : product.stock) <= 0 && (
+            <span className="bg-black/90 backdrop-blur-sm px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm">
+              Sold Out
+            </span>
+          )}
         </div>
 
         <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 transform translate-y-4 transition-all duration-300 ease-out group-hover:opacity-100 group-hover:translate-y-0 flex justify-center z-20">
