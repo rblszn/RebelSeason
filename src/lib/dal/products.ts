@@ -44,6 +44,24 @@ export async function getAllProducts(
 }
 
 /**
+ * Get total count of products for pagination.
+ */
+export async function getProductsCount(
+  options?: GetProductsOptions
+): Promise<number> {
+  const { categorySlug, isFeatured, isNew, isBestSeller } = options || {};
+
+  return prisma.product.count({
+    where: {
+      ...(categorySlug ? { category: { slug: categorySlug } } : {}),
+      ...(isFeatured !== undefined ? { isFeatured } : {}),
+      ...(isNew !== undefined ? { isNew } : {}),
+      ...(isBestSeller !== undefined ? { isBestSeller } : {}),
+    },
+  });
+}
+
+/**
  * Fetch a single product by its unique slug.
  */
 export async function getProductBySlug(

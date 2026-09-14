@@ -1,13 +1,23 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { getAllProducts } from "@/lib/dal/products";
+import { getAllProducts, getProductsCount } from "@/lib/dal/products";
+import { Pagination } from "@/components/ui/Pagination";
 import Image from "next/image";
 import { ProductActions } from "./ProductActions";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminProductsPage() {
-  const products = await getAllProducts();
+export default async function AdminProductsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedParams = await searchParams;
+  const page = parseInt(resolvedParams.page || "1", 10);
+  const limit = 10;
+  const skip = (page - 1) * limit;
+
+  const [products, total] = await Promise.all([
+    getAllProducts({ skip, limit }),
+    getProductsCount()
+  ]);
+  const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="p-6">
@@ -78,6 +88,11 @@ export default async function AdminProductsPage() {
             )}
           </tbody>
         </table>
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-gray-200">
+            <Pagination totalPages={totalPages} currentPage={page} />
+          </div>
+        )}
       </div>
     </div>
   );

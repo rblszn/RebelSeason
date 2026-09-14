@@ -1,4 +1,5 @@
-import { getAllCustomers } from "@/lib/dal/users";
+import { getAllCustomers, getCustomersCount } from "@/lib/dal/users";
+import { Pagination } from "@/components/ui/Pagination";
 import { format } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -7,8 +8,18 @@ export const metadata = {
   title: "Customers | Admin",
 };
 
-export default async function CustomersPage() {
-  const customers = await getAllCustomers();
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedParams = await searchParams;
+  const page = parseInt(resolvedParams.page || "1", 10);
+  const search = resolvedParams.search;
+  const limit = 10;
+  const skip = (page - 1) * limit;
+
+  const [customers, total] = await Promise.all([
+    getAllCustomers({ skip, limit, search }),
+    getCustomersCount({ search })
+  ]);
+  const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="space-y-6">
@@ -63,6 +74,11 @@ export default async function CustomersPage() {
             </div>
           )}
         </div>
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-gray-200">
+            <Pagination totalPages={totalPages} currentPage={page} />
+          </div>
+        )}
       </div>
     </div>
   );

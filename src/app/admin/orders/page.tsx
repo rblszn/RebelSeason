@@ -1,4 +1,5 @@
-﻿import { getAllOrders } from "@/lib/dal/orders";
+﻿import { getAllOrders, getOrdersCount } from "@/lib/dal/orders";
+import { Pagination } from "@/components/ui/Pagination";
 import Link from "next/link";
 import { format } from "date-fns";
 
@@ -8,8 +9,17 @@ export const metadata = {
   title: "Orders | Admin",
 };
 
-export default async function OrdersPage() {
-  const orders = await getAllOrders();
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedParams = await searchParams;
+  const page = parseInt(resolvedParams.page || "1", 10);
+  const limit = 10;
+  const skip = (page - 1) * limit;
+
+  const [orders, total] = await Promise.all([
+    getAllOrders({ skip, limit }),
+    getOrdersCount()
+  ]);
+  const totalPages = Math.ceil(total / limit);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -90,6 +100,11 @@ export default async function OrdersPage() {
             </div>
           )}
         </div>
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-gray-200">
+            <Pagination totalPages={totalPages} currentPage={page} />
+          </div>
+        )}
       </div>
     </div>
   );

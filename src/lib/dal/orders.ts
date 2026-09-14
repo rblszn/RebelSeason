@@ -40,6 +40,22 @@ export async function getAllOrders(
 }
 
 /**
+ * Get total count of orders for pagination.
+ */
+export async function getOrdersCount(
+  options?: GetOrdersOptions
+): Promise<number> {
+  const { status, customerId } = options || {};
+
+  return prisma.order.count({
+    where: {
+      ...(status ? { status } : {}),
+      ...(customerId ? { customerId } : {}),
+    },
+  });
+}
+
+/**
  * Fetch an order by its unique ID.
  */
 export async function getOrderById(

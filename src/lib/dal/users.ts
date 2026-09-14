@@ -51,6 +51,30 @@ export async function getAllCustomers(
 }
 
 /**
+ * Get total count of customers for pagination.
+ */
+export async function getCustomersCount(
+  options?: GetCustomersOptions
+): Promise<number> {
+  const { search } = options || {};
+
+  return prisma.user.count({
+    where: {
+      role: Role.CUSTOMER,
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
+  });
+}
+
+/**
  * Fetch a customer by their unique ID.
  */
 export async function getCustomerById(

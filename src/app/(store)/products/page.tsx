@@ -1,10 +1,25 @@
 import { ProductCard } from "@/components/product/ProductCard";
-import { getAllProducts } from "@/lib/dal/products";
+import { getAllProducts, getProductsCount } from "@/lib/dal/products";
 import { Button } from "@/components/ui/button";
 import { SlidersHorizontal, ChevronDown } from "lucide-react";
+import { Pagination } from "@/components/ui/Pagination";
 
-export default async function ProductsPage() {
-  const products = await getAllProducts();
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const resolvedParams = await searchParams;
+  const page = resolvedParams.page ? parseInt(resolvedParams.page as string, 10) : 1;
+  const limit = 12;
+  const skip = (page - 1) * limit;
+
+  const [products, totalCount] = await Promise.all([
+    getAllProducts({ skip, limit }),
+    getProductsCount(),
+  ]);
+
+  const totalPages = Math.ceil(totalCount / limit);
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full">
@@ -23,7 +38,7 @@ export default async function ProductsPage() {
           Filter
         </Button>
         <div className="text-[12px] uppercase tracking-[0.1em] text-muted-foreground hidden sm:block font-medium">
-          {products.length} Results
+          {totalCount} Results
         </div>
         <Button variant="ghost" className="text-[12px] uppercase tracking-[0.1em] font-semibold gap-2 hover:bg-transparent">
           Sort: Recommended
@@ -38,12 +53,8 @@ export default async function ProductsPage() {
         ))}
       </div>
 
-      {/* Pagination (Mock) */}
-      <div className="mt-24 flex justify-center">
-        <Button variant="outline" className="rounded-none px-12 h-12 font-semibold uppercase tracking-[0.2em] text-[11px] border-foreground text-foreground hover:bg-foreground hover:text-background transition-colors">
-          Load More
-        </Button>
-      </div>
+      {/* Pagination */}
+      <Pagination totalPages={totalPages} currentPage={page} />
     </div>
   );
 }
