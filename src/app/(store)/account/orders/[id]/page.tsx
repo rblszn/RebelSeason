@@ -1,19 +1,24 @@
 import { getOrderById } from '@/lib/dal/orders';
-import OrderSuccessClient from './OrderSuccessClient';
+import OrderDetailsClient from './OrderDetailsClient';
 import { notFound, redirect } from 'next/navigation';
+import { getCustomerSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export default async function OrderSuccessPage({
-  searchParams,
+export default async function AccountOrderDetailsPage({
+  params,
 }: {
-  searchParams: Promise<{ id?: string }>;
+  params: Promise<{ id: string }>;
 }) {
-  const params = await searchParams;
-  const id = params?.id;
+  const { id } = await params;
   
   if (!id) {
-    redirect('/');
+    redirect('/account');
+  }
+
+  const session = await getCustomerSession();
+  if (!session.isLoggedIn || !session.userId) {
+    redirect('/login');
   }
 
   const order = await getOrderById(id);
@@ -22,15 +27,9 @@ export default async function OrderSuccessPage({
     notFound();
   }
 
-  const { getCustomerSession } = await import('@/lib/auth');
-  const session = await getCustomerSession();
-  
+  // Security Check: Ensure the order belongs to the logged-in user
   if (order.customerId !== session.userId) {
-    redirect('/login');
-  }
-
-  if (order.status === 'PENDING' || order.status === 'CANCELLED') {
-    // Order not yet paid or was cancelled
+    redirect('/account');
   }
 
   // Serialize order for client component
@@ -49,5 +48,9 @@ export default async function OrderSuccessPage({
     })),
   };
 
-  return <OrderSuccessClient order={serializedOrder} />;
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+      <OrderDetailsClient order={serializedOrder} />
+    </div>
+  );
 }

@@ -49,7 +49,7 @@ export default function LoginPage() {
           {error && <div className="text-red-500 text-sm text-center">{error}</div>}
           <div>
             <label className="block text-[12px] font-medium text-foreground mb-2">Email Address</label>
-            <Input type="email" placeholder="Email" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 bg-transparent rounded-sm" />
+            <Input type="email" placeholder="Email Address" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 bg-transparent rounded-sm" />
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -64,7 +64,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-8 text-center text-[13px] text-muted-foreground">
-          Don't have an account? <Link href="/signup" className="text-foreground underline underline-offset-4 font-medium hover:text-muted-foreground">Sign Up</Link>
+          Don&apos;t have an account? <Link href="/signup" className="text-foreground underline underline-offset-4 font-medium hover:text-muted-foreground">Sign Up</Link>
         </p>
       </div>
     </div>

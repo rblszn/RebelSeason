@@ -16,10 +16,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid request payload" }, { status: 400 });
     }
 
-    // Two flows:
-    // 1. Initial Signup (Send OTP)
-    // 2. Verify OTP
-
     if (body.action === "verify") {
       if (!(await checkRateLimit(ip, "otp_verify", 5))) {
         return NextResponse.json({ error: "Too many verification attempts. Please try again later." }, { status: 429 });
@@ -71,13 +67,13 @@ export async function POST(request: Request) {
 
     const { name, email, phone, password } = body;
 
-    if (!name || !email || !password || !phone) {
-      return NextResponse.json({ error: "Name, email, phone, and password are required" }, { status: 400 });
+    if (!name || !email || !password) {
+      return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check if user already exists
+    // Check if user already exists by email
     const existingUser = await prisma.user.findUnique({
       where: { email: normalizedEmail },
     });
@@ -101,7 +97,7 @@ export async function POST(request: Request) {
     session.pendingUser = {
       name: name.trim(),
       email: normalizedEmail,
-      phone: phone.trim(),
+      phone: phone?.trim() || undefined,
       passwordHash: hashedPassword,
     };
     await session.save();
@@ -109,7 +105,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       requiresOtp: true,
-      message: "OTP sent successfully to email",
+      message: "OTP sent successfully to your email",
     });
 
   } catch (error) {

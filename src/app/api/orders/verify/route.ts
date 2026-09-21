@@ -53,11 +53,10 @@ export async function POST(req: Request) {
       }
     }
 
-    try {
-      await sendOrderConfirmationEmail(order.customerEmail, order);
-    } catch (e) {
+    // Fire and forget email to speed up response
+    sendOrderConfirmationEmail(order.customerEmail, order).catch(e => {
       console.error("Failed to send order confirmation email:", e);
-    }
+    });
 
     return NextResponse.json({ success: true, orderId });
   } catch (error) {

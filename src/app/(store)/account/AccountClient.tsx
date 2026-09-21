@@ -182,10 +182,10 @@ export function AccountClient({ session, orders }: AccountClientProps) {
             ) : (
               <div className="space-y-6">
                 {orders.map((order) => (
-                  <div key={order.id} className="border border-border rounded-md p-6">
+                  <Link href={`/account/orders/${order.id}`} key={order.id} className="block border border-border rounded-md p-6 hover:border-foreground hover:shadow-sm transition-all cursor-pointer group">
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <p className="font-medium">Order #{order.orderNumber}</p>
+                        <p className="font-medium group-hover:underline">Order #{order.orderNumber}</p>
                         <p className="text-[13px] text-muted-foreground">{format(new Date(order.createdAt), 'MMM dd, yyyy')}</p>
                       </div>
                       <div className="text-right">
@@ -209,7 +209,7 @@ export function AccountClient({ session, orders }: AccountClientProps) {
                         ))}
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

@@ -120,10 +120,9 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Phone Number</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Phone Number <span className="text-muted-foreground text-xs">(optional)</span></label>
               <input
                 type="tel"
-                required
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 className="w-full p-2.5 border border-border rounded-md focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all"

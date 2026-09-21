@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, FolderTree, ShoppingBag, Users, Store, ShieldCheck, X, ExternalLink } from "lucide-react";
+import { LayoutDashboard, Package, FolderTree, ShoppingBag, Users, Store, ShieldCheck, X, ExternalLink, Tag } from "lucide-react";
 
 interface AdminSidebarProps {
   mobileOpen?: boolean;
@@ -38,6 +38,12 @@ const navItems = [
     name: "Customers",
     href: "/admin/customers",
     icon: Users,
+    exact: false,
+  },
+  {
+    name: "Coupons",
+    href: "/admin/coupons",
+    icon: Tag,
     exact: false,
   },
   {

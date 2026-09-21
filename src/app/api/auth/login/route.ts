@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const isAllowed = await checkRateLimit(ip, "login", 5); // 5 requests per 15 min
+    const isAllowed = await checkRateLimit(ip, "login", 5);
     if (!isAllowed) {
       return NextResponse.json(
         { error: "Too many login attempts. Please try again later." },
@@ -43,11 +43,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+      where: { email: email.toLowerCase().trim() },
     });
 
     if (!user) {
@@ -67,7 +65,6 @@ export async function POST(request: Request) {
     }
 
     // Strict role separation:
-    // 1. Admin login portal cannot be used with customer credentials
     if (isAdmin === true || portal === "admin") {
       if (user.role !== "ADMIN") {
         return NextResponse.json(
@@ -77,7 +74,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Customer storefront login cannot be used with admin credentials
     if (isAdmin === false || portal === "store" || portal === "customer") {
       if (user.role === "ADMIN") {
         return NextResponse.json(
@@ -144,10 +140,6 @@ export async function POST(request: Request) {
   }
 }
 
-/**
- * GET /api/auth/login
- * Returns active session info (admin or customer)
- */
 export async function GET() {
   try {
     const adminSession = await getAdminSession();

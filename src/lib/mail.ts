@@ -127,6 +127,7 @@ export async function sendOrderConfirmationEmail(to: string, order: any): Promis
           <td colspan="2" align="right" style="padding: 8px 0; font-size: 14px; color: #666666;">Shipping:</td>
           <td align="right" style="padding: 8px 0; font-weight: 500; color: #111111;">${order.shipping === 0 ? 'Free' : '\u20B9' + order.shipping}</td>
         </tr>
+        ${order.discount > 0 ? '<tr><td colspan="2" align="right" style="padding: 8px 0; font-size: 14px; color: #16a34a;">Discount ' + (order.couponCode ? '(' + order.couponCode + ')' : '') + ':</td><td align="right" style="padding: 8px 0; font-weight: 500; color: #16a34a;">-\\u20B9' + order.discount + '</td></tr>' : ''}
         <tr>
           <td colspan="2" align="right" style="padding: 12px 0 0; font-size: 16px; font-weight: 700; color: #111111; border-top: 2px solid #111111;">Total:</td>
           <td align="right" style="padding: 12px 0 0; font-size: 16px; font-weight: 700; color: #111111; border-top: 2px solid #111111;">\u20B9${order.total}</td>

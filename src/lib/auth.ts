@@ -9,6 +9,7 @@ export interface SessionData {
   pendingOtp?: string;
   pendingUser?: { name: string; email: string; phone?: string; passwordHash: string };
   resetEmail?: string;
+  resetPhone?: string;
   resetOtp?: string;
   isLoggedIn: boolean;
 }
@@ -30,7 +31,7 @@ export const sessionOptions: SessionOptions = {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
     sameSite: "lax" as const,
-    maxAge: 60 * 60 * 24, // 24 hours
+    maxAge: 60 * 60 * 24 * 30, // 30 days
   },
 };
 
@@ -71,4 +72,3 @@ export async function getAdminSession() {
   const cookieStore = await cookies();
   return getIronSession<AdminSessionData>(cookieStore, adminSessionOptions);
 }
-

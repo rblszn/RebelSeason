@@ -4,8 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 
 export default function OrderSuccessClient({ order }: { order: any }) {
-  const subtotal = order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-  const shipping = order.total > subtotal ? order.total - subtotal : 0;
+  const subtotal = order.subtotal || order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+  const shipping = order.shipping || 0;
+  const discount = order.discount || 0;
+  const couponCode = order.couponCode;
   
   const paymentId = order.payment?.razorpayPaymentId || order.paymentId || "N/A";
 
@@ -98,6 +100,12 @@ export default function OrderSuccessClient({ order }: { order: any }) {
                 <p>Shipping</p>
                 <p>{shipping > 0 ? `₹${shipping.toLocaleString("en-IN")}` : "Free"}</p>
               </div>
+              {discount > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <p>Discount {couponCode ? `(${couponCode})` : ""}</p>
+                  <p>-₹{discount.toLocaleString("en-IN")}</p>
+                </div>
+              )}
               <div className="flex justify-between text-lg font-bold text-gray-900 pt-3 border-t border-gray-100">
                 <p>Total</p>
                 <p>₹{order.total.toLocaleString("en-IN")}</p>
