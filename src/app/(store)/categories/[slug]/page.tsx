@@ -1,9 +1,6 @@
 import { ProductCard } from "@/components/product/ProductCard";
-import { Button } from "@/components/ui/button";
-import { SlidersHorizontal, ChevronDown } from "lucide-react";
 import { notFound } from "next/navigation";
-import { getCategoryBySlug } from "@/lib/dal/categories";
-import { getAllProducts, getProductsCount } from "@/lib/dal/products";
+import { getCategoryNameBySlug, getProductPage, parsePage } from "@/lib/dal/catalog";
 import { Pagination } from "@/components/ui/Pagination";
 
 interface CategoryPageProps {
@@ -15,38 +12,25 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
   
-  const page = resolvedSearchParams.page ? parseInt(resolvedSearchParams.page as string, 10) : 1;
-  const limit = 12;
-  const skip = (page - 1) * limit;
+  const page = parsePage(resolvedSearchParams.page);
 
-  let categoryName = "";
-  let products = [];
-  let totalCount = 0;
-  
+  let categoryName: string;
+  let categorySlug: string | null;
+
   if (resolvedParams.slug === "new-arrivals") {
+    // New Arrivals is all products, newest first.
     categoryName = "New Arrivals";
-    // New Arrivals is essentially all products ordered by creation date (default in getAllProducts)
-    const [fetchedProducts, count] = await Promise.all([
-      getAllProducts({ skip, limit }),
-      getProductsCount(),
-    ]);
-    products = fetchedProducts;
-    totalCount = count;
+    categorySlug = null;
   } else {
-    const category = await getCategoryBySlug(resolvedParams.slug);
+    const category = await getCategoryNameBySlug(resolvedParams.slug);
     if (!category) {
       return notFound();
     }
     categoryName = category.name;
-    const [fetchedProducts, count] = await Promise.all([
-      getAllProducts({ categorySlug: resolvedParams.slug, skip, limit }),
-      getProductsCount({ categorySlug: resolvedParams.slug }),
-    ]);
-    products = fetchedProducts;
-    totalCount = count;
+    categorySlug = resolvedParams.slug;
   }
 
-  const totalPages = Math.ceil(totalCount / limit);
+  const { products, total: totalCount, totalPages } = await getProductPage(page, categorySlug);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
@@ -54,25 +38,17 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         <h1 className="font-heading text-4xl sm:text-5xl font-medium mb-4">{categoryName}</h1>
       </div>
 
-      <div className="flex justify-between items-center py-4 border-y border-border mb-8">
-        <Button variant="ghost" className="text-sm font-medium gap-2">
-          <SlidersHorizontal className="w-4 h-4" />
-          Filter
-        </Button>
-        <div className="text-sm text-muted-foreground hidden sm:block">
+      <div className="flex justify-center items-center py-4 border-y border-border mb-8">
+        <div className="text-sm text-muted-foreground">
           {totalCount} Results
         </div>
-        <Button variant="ghost" className="text-sm font-medium gap-2">
-          Sort by: Recommended
-          <ChevronDown className="w-4 h-4" />
-        </Button>
       </div>
 
       {products.length > 0 ? (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 sm:gap-x-6 gap-y-10">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+            {products.map((product, i) => (
+              <ProductCard key={product.id} product={product} priority={i < 4} />
             ))}
           </div>
           <Pagination totalPages={totalPages} currentPage={page} />

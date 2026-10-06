@@ -115,11 +115,11 @@ export default function ForgotPasswordPage() {
               <div>
                 <Input
                   type="password"
-                  placeholder="New Password"
+                  placeholder="New Password (min 8 characters)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={8}
                   className="h-12 rounded-none bg-secondary/50 border-border"
                 />
               </div>

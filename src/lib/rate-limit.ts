@@ -10,19 +10,30 @@ type RateLimitInfo = {
 const memoryLimits = new Map<string, RateLimitInfo>();
 
 let redis: Redis | null = null;
-let ratelimit: Ratelimit | null = null;
 
 if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
   redis = new Redis({
     url: process.env.KV_REST_API_URL,
     token: process.env.KV_REST_API_TOKEN,
   });
-  // Generic ratelimiter, we will override window inside the function if needed
-  ratelimit = new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(100, "15 m"),
-    analytics: true,
-  });
+}
+
+// One limiter per (limit, window) pair, reused across requests.
+const limiters = new Map<string, Ratelimit>();
+
+function getLimiter(maxRequests: number, windowSeconds: number): Ratelimit | null {
+  if (!redis) return null;
+  const key = `${maxRequests}:${windowSeconds}`;
+  let limiter = limiters.get(key);
+  if (!limiter) {
+    limiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(maxRequests, `${windowSeconds} s`),
+      prefix: "rs_ratelimit",
+    });
+    limiters.set(key, limiter);
+  }
+  return limiter;
 }
 
 /**
@@ -43,17 +54,10 @@ export async function checkRateLimit(
   const key = `${action}:${ip}`;
 
   // Try Redis first
-  if (redis && ratelimit) {
+  const limiter = getLimiter(maxRequests, Math.max(1, Math.floor(windowMs / 1000)));
+  if (limiter) {
     try {
-      // Create a custom ratelimit instance for this specific limit if needed
-      // since different actions have different windows/limits
-      const windowSeconds = Math.max(1, Math.floor(windowMs / 1000));
-      const specificLimiter = new Ratelimit({
-        redis,
-        limiter: Ratelimit.slidingWindow(maxRequests, `${windowSeconds} s`),
-      });
-      
-      const { success } = await specificLimiter.limit(key);
+      const { success } = await limiter.limit(key);
       return success;
     } catch (error) {
       console.warn("Redis rate limiting failed, falling back to memory:", error);

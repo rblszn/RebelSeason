@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { revalidateCatalog } from "@/lib/cache";
 import { getAllCategories } from "@/lib/dal/categories";
 
 export async function GET() {
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
       },
     });
 
+    revalidateCatalog();
     return NextResponse.json(newCategory, { status: 201 });
   } catch (error: any) {
     console.error("Error creating category:", error);

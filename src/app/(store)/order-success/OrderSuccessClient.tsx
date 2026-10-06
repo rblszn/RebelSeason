@@ -1,15 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { cldImage } from "@/lib/images";
 
-export default function OrderSuccessClient({ order }: { order: any }) {
-  const subtotal = order.subtotal || order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-  const shipping = order.shipping || 0;
-  const discount = order.discount || 0;
-  const couponCode = order.couponCode;
-  
-  const paymentId = order.payment?.razorpayPaymentId || order.paymentId || "N/A";
+type SuccessOrder = {
+  id: string;
+  orderNumber: string;
+  status: string;
+  subtotal: number;
+  shipping: number;
+  discount: number;
+  total: number;
+  couponCode: string | null;
+  shippingAddress: unknown;
+  createdAt: string;
+  payment: { status: string; razorpayPaymentId: string | null } | null;
+  items: { id: string; name: string; variantName: string | null; quantity: number; price: number; image: string | null }[];
+};
+
+export default function OrderSuccessClient({ order }: { order: SuccessOrder }) {
+  const { subtotal, shipping, discount, couponCode } = order;
+  const isPaid = order.payment?.status === "CAPTURED";
+  const paymentId = order.payment?.razorpayPaymentId || "N/A";
+  const router = useRouter();
+  const refreshes = useRef(0);
+
+  // Poll briefly while the webhook confirms the payment, then stop.
+  useEffect(() => {
+    if (isPaid || refreshes.current >= 6) return;
+    const timer = setTimeout(() => {
+      refreshes.current += 1;
+      router.refresh();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [isPaid, order, router]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-IN", {
@@ -25,15 +51,21 @@ export default function OrderSuccessClient({ order }: { order: any }) {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {/* Header */}
           <div className="p-8 sm:p-12 text-center border-b border-gray-100 bg-gradient-to-b from-green-50/50 to-white">
-            <div className="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
-              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white">
+            <div className={`mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-6 ${isPaid ? "bg-green-100 animate-pulse" : "bg-amber-100"}`}>
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white ${isPaid ? "bg-green-500" : "bg-amber-500"}`}>
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
             </div>
-            <h1 className="text-4xl font-heading font-bold text-gray-900 mb-2">Order Confirmed!</h1>
-            <p className="text-gray-500 text-lg">Thank you for your purchase.</p>
+            <h1 className="text-4xl font-heading font-bold text-gray-900 mb-2">
+              {isPaid ? "Order Confirmed!" : "Payment Processing"}
+            </h1>
+            <p className="text-gray-500 text-lg">
+              {isPaid
+                ? "Thank you for your purchase."
+                : "We're waiting for confirmation from the payment provider. This page updates automatically, and you'll get an email once it's confirmed."}
+            </p>
           </div>
 
           <div className="p-8 sm:p-12">
@@ -41,7 +73,7 @@ export default function OrderSuccessClient({ order }: { order: any }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 pb-10 border-b border-gray-100">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Order Number</p>
-                <p className="font-semibold text-gray-900">{order.id}</p>
+                <p className="font-semibold text-gray-900">{order.orderNumber}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500 mb-1">Date</p>
@@ -49,9 +81,15 @@ export default function OrderSuccessClient({ order }: { order: any }) {
               </div>
               <div>
                 <p className="text-sm text-gray-500 mb-1">Payment Status</p>
-                <p className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  Paid ✓
-                </p>
+                {isPaid ? (
+                  <p className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Paid ✓
+                  </p>
+                ) : (
+                  <p className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                    Pending
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-sm text-gray-500 mb-1">Payment ID</p>
@@ -62,15 +100,15 @@ export default function OrderSuccessClient({ order }: { order: any }) {
             {/* Items */}
             <h2 className="text-xl font-heading font-semibold text-gray-900 mb-6">Order Items</h2>
             <div className="space-y-6 mb-10 pb-10 border-b border-gray-100">
-              {order.items.map((item: any) => (
+              {order.items.map((item) => (
                 <div key={item.id} className="flex items-center">
                   <div className="flex-shrink-0 w-16 h-20 bg-gray-100 rounded-md overflow-hidden relative">
                     {item.image ? (
-                      <Image
-                        src={item.image}
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={cldImage(item.image, 200)}
                         alt={item.name || 'Product Image'}
-                        fill
-                        className="object-cover"
+                        className="absolute inset-0 w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full bg-pink-100/50 flex items-center justify-center text-pink-300">
@@ -113,8 +151,8 @@ export default function OrderSuccessClient({ order }: { order: any }) {
             </div>
 
             {/* Shipping Address */}
-            {order.shippingAddress && (() => {
-              const addr = typeof order.shippingAddress === 'string' ? JSON.parse(order.shippingAddress) : order.shippingAddress;
+            {Boolean(order.shippingAddress) && (() => {
+              const addr = (typeof order.shippingAddress === 'string' ? JSON.parse(order.shippingAddress) : order.shippingAddress) as Record<string, string>;
               return (
                 <div className="mb-10 bg-gray-50 rounded-xl p-6">
                   <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4">Shipping Address</h2>

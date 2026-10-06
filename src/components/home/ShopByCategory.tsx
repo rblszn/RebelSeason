@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { CategoryWithRelations } from "@/lib/dal";
+import { cldImage } from "@/lib/images";
+
+type CategoryTile = { id: string; name: string; slug: string; image: string | null };
 
 interface ShopByCategoryProps {
-  categories: CategoryWithRelations[];
+  categories: CategoryTile[];
 }
 
 export function ShopByCategory({ categories }: ShopByCategoryProps) {
@@ -31,7 +33,7 @@ export function ShopByCategory({ categories }: ShopByCategoryProps) {
               {category.image && (
                 <div 
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-105"
-                  style={{ backgroundImage: `url('${category.image}')` }}
+                  style={{ backgroundImage: `url('${cldImage(category.image, 400)}')` }}
                 />
               )}
               <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-500" />

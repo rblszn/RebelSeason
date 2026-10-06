@@ -109,7 +109,7 @@ export function SalesChart({ data }: SalesChartProps) {
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
+                tickFormatter={(value) => (value >= 1000 ? `₹${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : `₹${value}`)}
               />
               <Tooltip content={<CustomTooltip />} />
               <Area

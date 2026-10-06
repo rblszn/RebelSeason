@@ -20,6 +20,7 @@
         "class-variance-authority": "^0.7.1",
         "cloudinary": "^2.11.0",
         "clsx": "^2.1.1",
+        "csv-parser": "^3.2.1",
         "date-fns": "^4.4.0",
         "iron-session": "^9.0.1",
         "lucide-react": "^1.41.0",
@@ -30,6 +31,7 @@
         "react-dom": "19.2.8",
         "recharts": "^3.10.1",
         "tailwind-merge": "^3.6.0",
+        "xlsx": "^0.18.5",
         "zod": "^4.6.1"
     },
     "devDependencies": {

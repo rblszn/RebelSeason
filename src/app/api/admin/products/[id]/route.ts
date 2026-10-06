@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getProductById } from "@/lib/dal/products";
+import { revalidateCatalog } from "@/lib/cache";
+import { productData, productInputSchema, prismaErrorResponse, syncVariants } from "@/lib/admin-products";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -19,36 +21,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const data = await req.json();
-    const { variants, stock, ...productData } = data;
-    
-    if (productData.hasVariants) {
-      await prisma.productVariant.deleteMany({
-        where: { productId: id }
-      });
-    } else {
-      await prisma.productVariant.deleteMany({
-        where: { productId: id }
-      });
+    const parsed = productInputSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid product data" }, { status: 400 });
     }
+    const input = parsed.data;
 
-    const product = await prisma.product.update({
-      where: { id },
-      data: {
-        ...productData,
-        stock: stock || 0,
-        variants: productData.hasVariants && variants && variants.length > 0 ? {
-          create: variants
-        } : undefined
-      },
-      include: {
-        category: true,
-        variants: true
-      }
+    const product = await prisma.$transaction(async (tx) => {
+      await tx.product.update({ where: { id }, data: productData(input) });
+      await syncVariants(tx, id, input.hasVariants, input.variants);
+      return tx.product.findUnique({ where: { id }, include: { category: true, variants: true } });
     });
-    
+
+    revalidateCatalog();
     return NextResponse.json(product);
   } catch (error) {
+    const known = prismaErrorResponse(error);
+    if (known) return NextResponse.json({ error: known.error }, { status: known.status });
     console.error("Error updating product:", error);
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
   }
@@ -60,8 +49,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     await prisma.product.delete({
       where: { id }
     });
+    revalidateCatalog();
     return NextResponse.json({ success: true });
   } catch (error) {
+    const known = prismaErrorResponse(error);
+    if (known) return NextResponse.json({ error: known.error }, { status: known.status });
     console.error("Error deleting product:", error);
     return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
   }

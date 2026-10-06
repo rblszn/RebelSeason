@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getDashboardStats, getMockSalesChartData } from "@/lib/dal";
+import { getDashboardStats, getSalesChartData } from "@/lib/dal";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [stats, recentOrders] = await Promise.all([
+    const [stats, recentOrders, salesChart] = await Promise.all([
       getDashboardStats(),
       prisma.order.findMany({
         take: 5,
@@ -23,9 +23,8 @@ export async function GET() {
           payment: true,
         },
       }),
+      getSalesChartData(),
     ]);
-
-    const salesChart = getMockSalesChartData();
 
     return NextResponse.json({
       success: true,

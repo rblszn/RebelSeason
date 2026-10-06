@@ -1,4 +1,4 @@
-import { getDashboardStats, getMockSalesChartData, getAllOrders } from "@/lib/dal";
+import { getDashboardStats, getSalesChartData, getAllOrders } from "@/lib/dal";
 import { KPICard } from "@/components/admin/KPICard";
 import { SalesChart } from "@/components/admin/SalesChart";
 import { RecentOrdersWidget } from "@/components/admin/RecentOrdersWidget";
@@ -22,16 +22,18 @@ export default async function AdminDashboardPage() {
     totalCustomers: 0,
     totalProducts: 0,
   };
-  let recentOrders: any[] = [];
-  const chartData = getMockSalesChartData();
+  let recentOrders: Awaited<ReturnType<typeof getAllOrders>> = [];
+  let chartData: Awaited<ReturnType<typeof getSalesChartData>> = [];
 
   try {
-    const [fetchedStats, fetchedOrders] = await Promise.all([
+    const [fetchedStats, fetchedOrders, fetchedChart] = await Promise.all([
       getDashboardStats(),
       getAllOrders({ limit: 5 }),
+      getSalesChartData(),
     ]);
     stats = fetchedStats;
     recentOrders = fetchedOrders;
+    chartData = fetchedChart;
   } catch (error) {
     console.error("Error loading admin dashboard metrics directly from DAL:", error);
   }

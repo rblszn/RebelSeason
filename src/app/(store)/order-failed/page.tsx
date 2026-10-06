@@ -1,5 +1,8 @@
-import { getOrderById } from '@/lib/dal/orders';
+import { prisma } from '@/lib/db';
+import { getCustomerSession } from '@/lib/auth';
 import OrderFailedClient from './OrderFailedClient';
+
+export const dynamic = 'force-dynamic';
 
 export default async function OrderFailedPage({
   searchParams,
@@ -8,21 +11,19 @@ export default async function OrderFailedPage({
 }) {
   const params = await searchParams;
   const id = params?.id;
-  
-  let serializedOrder = null;
+
+  let order: { orderNumber: string } | null = null;
 
   if (id) {
-    const order = await getOrderById(id);
-    
-    if (order) {
-      serializedOrder = {
-        ...order,
-        total: Number(order.total),
-        createdAt: order.createdAt.toISOString(),
-        updatedAt: order.updatedAt.toISOString(),
-      };
+    const session = await getCustomerSession();
+    if (session.isLoggedIn && session.userId) {
+      // Only reveal the order to the customer who placed it.
+      order = await prisma.order.findFirst({
+        where: { id, customerId: session.userId },
+        select: { orderNumber: true },
+      });
     }
   }
 
-  return <OrderFailedClient order={serializedOrder} />;
+  return <OrderFailedClient order={order} />;
 }

@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
-export function Footer() {
+export function Footer({ categories }: { categories: { name: string; slug: string }[] }) {
   return (
     <footer className="bg-foreground text-background">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
@@ -30,12 +28,9 @@ export function Footer() {
             <h4 className="text-[11px] font-semibold uppercase tracking-[0.15em] mb-6 text-white/80">Shop</h4>
             <ul className="space-y-3 text-[13px] text-background/60">
               <li><Link href="/products" className="hover:text-white transition-colors">All Products</Link></li>
-              <li><Link href="/categories/dresses" className="hover:text-white transition-colors">Dresses</Link></li>
-              <li><Link href="/categories/co-ords" className="hover:text-white transition-colors">Co-ords</Link></li>
-              <li><Link href="/categories/bottoms" className="hover:text-white transition-colors">Bottoms</Link></li>
-              <li><Link href="/categories/bags" className="hover:text-white transition-colors">Bags</Link></li>
-              <li><Link href="/categories/jeans" className="hover:text-white transition-colors">Jeans</Link></li>
-              <li><Link href="/categories/winterwear" className="hover:text-white transition-colors">Winterwear</Link></li>
+              {categories.map((c) => (
+                <li key={c.slug}><Link href={`/categories/${c.slug}`} className="hover:text-white transition-colors">{c.name}</Link></li>
+              ))}
             </ul>
           </div>
 
@@ -44,10 +39,10 @@ export function Footer() {
             <h4 className="text-[11px] font-semibold uppercase tracking-[0.15em] mb-6 text-white/80">Support</h4>
             <ul className="space-y-3 text-[13px] text-background/60">
               <li><Link href="/contact" className="hover:text-white transition-colors">Contact Us</Link></li>
-              <li><Link href="/faq" className="hover:text-white transition-colors">FAQs</Link></li>
-              <li><Link href="/shipping" className="hover:text-white transition-colors">Shipping Policy</Link></li>
-              <li><Link href="/returns" className="hover:text-white transition-colors">Returns & Exchanges</Link></li>
-              <li><Link href="/size-guide" className="hover:text-white transition-colors">Size Guide</Link></li>
+              <li><Link href="/shipping" className="hover:text-white transition-colors">Shipping &amp; Delivery</Link></li>
+              <li><Link href="/returns" className="hover:text-white transition-colors">Cancellation &amp; Refunds</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition-colors">Terms &amp; Conditions</Link></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
             </ul>
           </div>
 
@@ -57,7 +52,7 @@ export function Footer() {
           <p>&copy; {new Date().getFullYear()} The Rebel Season. All rights reserved.</p>
           <div className="flex space-x-6">
             <Link href="/privacy" className="hover:text-background/70 transition-colors">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-background/70 transition-colors">Terms of Service</Link>
+            <Link href="/terms" className="hover:text-background/70 transition-colors">Terms &amp; Conditions</Link>
           </div>
         </div>
       </div>

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
+import { validateCoupon } from "@/lib/coupon-validation";
 
 export const dynamic = "force-dynamic";
+
 
 export async function GET() {
   try {
@@ -37,6 +39,10 @@ export async function POST(request: Request) {
 
     if (!code || !name || !type || !value) {
       return NextResponse.json({ error: "Code, name, type, and value are required" }, { status: 400 });
+    }
+    const invalid = validateCoupon({ code, type, value, maxLimit, appliesTo });
+    if (invalid) {
+      return NextResponse.json({ error: invalid }, { status: 400 });
     }
 
     const existing = await prisma.coupon.findUnique({ where: { code: code.toUpperCase() } });

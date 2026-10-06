@@ -1,81 +1,40 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { z } from "zod";
 import { getCustomerSession } from "@/lib/auth";
+import { cartSchema, evaluateCoupon, priceCart } from "@/lib/checkout";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
+const requestSchema = z.object({
+  code: z.string().trim().min(1).max(50),
+  items: cartSchema,
+});
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { code, cartTotal } = body;
+    // Limits brute-force guessing of coupon codes.
+    if (!(await checkRateLimit(getClientIp(request), "coupon_validate", 10, 10 * 60 * 1000))) {
+      return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
+    }
 
-    if (!code) {
+    const parsed = requestSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
       return NextResponse.json({ error: "Coupon code is required" }, { status: 400 });
     }
 
-    const coupon = await prisma.coupon.findUnique({
-      where: { code: code.toUpperCase().trim() },
-      include: {
-        _count: { select: { redemptions: true } },
-      },
-    });
-
-    if (!coupon) {
-      return NextResponse.json({ error: "Invalid coupon code" }, { status: 404 });
+    const pricing = await priceCart(parsed.data.items);
+    if (!pricing.ok) {
+      return NextResponse.json({ error: pricing.error }, { status: 409 });
     }
 
-    if (!coupon.isActive) {
-      return NextResponse.json({ error: "This coupon is no longer active" }, { status: 400 });
-    }
-
-    if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
-      return NextResponse.json({ error: "This coupon has expired" }, { status: 400 });
-    }
-
-    if (coupon.maxLimit > 0 && coupon._count.redemptions >= coupon.maxLimit) {
-      return NextResponse.json({ error: "This coupon has reached its usage limit" }, { status: 400 });
-    }
-
-    // Check per-user redemption
     const session = await getCustomerSession();
-    if (session.isLoggedIn && session.userId) {
-      const existingRedemption = await prisma.couponRedemption.findUnique({
-        where: {
-          couponId_userId: {
-            couponId: coupon.id,
-            userId: session.userId,
-          },
-        },
-      });
-
-      if (existingRedemption) {
-        return NextResponse.json({ error: "You have already used this coupon" }, { status: 400 });
-      }
+    const result = await evaluateCoupon(parsed.data.code, pricing, session.isLoggedIn ? session.userId ?? null : null);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    // Calculate discount
-    const baseAmount = cartTotal || 0;
-    let discount = 0;
-
-    if (coupon.type === "PERCENTAGE") {
-      discount = Math.floor((baseAmount * coupon.value) / 100);
-    } else {
-      // FLAT
-      discount = coupon.value;
-    }
-
-    // Cap discount to not exceed cart total
-    discount = Math.min(discount, baseAmount);
-
-    return NextResponse.json({
-      valid: true,
-      code: coupon.code,
-      name: coupon.name,
-      type: coupon.type,
-      value: coupon.value,
-      appliesTo: coupon.appliesTo,
-      discount,
-    });
+    return NextResponse.json({ valid: true, code: result.code, name: result.name, discount: result.discount });
   } catch (error) {
     console.error("Coupon validation error:", error);
     return NextResponse.json({ error: "Failed to validate coupon" }, { status: 500 });

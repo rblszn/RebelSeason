@@ -1,4 +1,4 @@
-﻿import { getAllOrders, getOrdersCount } from "@/lib/dal/orders";
+import { getAllOrders, getOrdersCount } from "@/lib/dal/orders";
 import { Pagination } from "@/components/ui/Pagination";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -11,13 +11,14 @@ export const metadata = {
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedParams = await searchParams;
-  const page = parseInt(resolvedParams.page || "1", 10);
+  const page = Math.max(1, parseInt(resolvedParams.page || "1", 10) || 1);
+  const search = (resolvedParams.q || "").trim().slice(0, 100);
   const limit = 10;
   const skip = (page - 1) * limit;
 
   const [orders, total] = await Promise.all([
-    getAllOrders({ skip, limit }),
-    getOrdersCount()
+    getAllOrders({ skip, limit, search }),
+    getOrdersCount({ search })
   ]);
   const totalPages = Math.ceil(total / limit);
 
@@ -44,6 +45,31 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">Orders</h1>
       </div>
 
+      <form method="get" className="flex flex-col gap-2 sm:flex-row">
+        <input
+          type="search"
+          name="q"
+          defaultValue={search}
+          placeholder="Search by order number (RS-…), customer name, email, phone or payment ID"
+          className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black"
+        />
+        <div className="flex gap-2">
+          <button type="submit" className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
+            Search
+          </button>
+          {search && (
+            <Link href="/admin/orders" className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              Clear
+            </Link>
+          )}
+        </div>
+      </form>
+      {search && (
+        <p className="text-sm text-gray-500">
+          {total} {total === 1 ? "order" : "orders"} matching &ldquo;{search}&rdquo;
+        </p>
+      )}
+
       <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -61,7 +87,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               {orders.map((order) => (
                 <tr key={order.id}>
                   <td className="whitespace-nowrap px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">{order.orderNumber}</div>
+                    <Link href={`/admin/orders/${order.id}`} className="font-mono text-sm font-medium text-gray-900 hover:underline">
+                      {order.orderNumber}
+                    </Link>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="text-sm text-gray-500">
@@ -74,7 +102,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="text-sm font-medium text-gray-900">
-                      ₹{(order.total / 100).toLocaleString('en-IN')}
+                      ₹{order.total.toLocaleString('en-IN')}
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
@@ -96,7 +124,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           </table>
           {orders.length === 0 && (
             <div className="p-6 text-center text-sm text-gray-500">
-              No orders found.
+              {search ? "No orders match your search." : "No orders found."}
             </div>
           )}
         </div>

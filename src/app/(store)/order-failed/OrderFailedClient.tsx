@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { X } from "lucide-react";
 
-export default function OrderFailedClient({ order }: { order: any }) {
+export default function OrderFailedClient({ order }: { order: { orderNumber: string } | null }) {
   return (
     <div className="min-h-[80vh] flex items-center justify-center bg-pink-50/30 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-lg w-full">
@@ -20,13 +20,13 @@ export default function OrderFailedClient({ order }: { order: any }) {
           </h1>
           
           <p className="text-gray-600 text-lg mb-6">
-            Don't worry, your money is safe.
+            Don&apos;t worry, your money is safe.
           </p>
 
           {order && (
             <div className="mb-6 py-3 px-4 bg-gray-50 rounded-lg inline-block">
-              <span className="text-sm text-gray-500">Order ID: </span>
-              <span className="font-semibold text-gray-900">{order.id}</span>
+              <span className="text-sm text-gray-500">Order: </span>
+              <span className="font-semibold text-gray-900">{order.orderNumber}</span>
             </div>
           )}
 

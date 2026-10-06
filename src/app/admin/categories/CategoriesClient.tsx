@@ -1,5 +1,6 @@
 "use client";
 
+import { uploadToCloudinary } from "@/lib/cloudinary-upload";
 import { useState } from "react";
 import { Plus, Edit2, Trash2, Upload, Loader2 } from "lucide-react";
 import { CategoryWithRelations } from "@/lib/dal/categories";
@@ -50,21 +51,12 @@ export default function CategoriesClient({
     if (!file) return;
 
     setUploading(true);
-    const form = new FormData();
-    form.append("file", file);
-
     try {
-      const res = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: form,
-      });
-      const data = await res.json();
-      if (data.url) {
-        setFormData(prev => ({ ...prev, image: data.url }));
-      }
+      const url = await uploadToCloudinary(file, "rebel-season/categories");
+      setFormData(prev => ({ ...prev, image: url }));
     } catch (err) {
       console.error("Upload failed", err);
-      alert("Upload failed");
+      alert(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }

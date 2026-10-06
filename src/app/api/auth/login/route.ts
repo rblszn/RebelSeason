@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import {
   getCustomerSession,
   getAdminSession,
+  setDisplayNameCookie,
 } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
       customerSession.role = "CUSTOMER";
       customerSession.isLoggedIn = true;
       await customerSession.save();
+      await setDisplayNameCookie(user.name);
 
       return NextResponse.json({
         success: true,

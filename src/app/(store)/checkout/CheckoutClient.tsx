@@ -3,20 +3,61 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
+import { shippingFor } from "@/lib/pricing";
+import { cldImage } from "@/lib/images";
+import { siteConfig } from "@/lib/site-config";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-export default function CheckoutClient({ session }: { session: any }) {
-  const { items, getTotal, clearCart } = useCart();
+type CheckoutSession = {
+  userId: string;
+  email: string;
+  name: string;
+  isLoggedIn: boolean;
+};
+
+type SavedAddress = {
+  id: string;
+  name: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  pincode: string;
+};
+
+type RazorpayResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayInstance = {
+  on: (event: string, handler: (response: { error?: { description?: string } }) => void) => void;
+  open: () => void;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => RazorpayInstance;
+  }
+}
+
+export default function CheckoutClient({ session }: { session: CheckoutSession }) {
+  const { items, getTotal, clearCart, syncPrices } = useCart();
   const router = useRouter();
-  
-  const [addresses, setAddresses] = useState<any[]>([]);
+
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
   const [showNewAddress, setShowNewAddress] = useState(false);
   const [email, setEmail] = useState(session?.email || "");
   const [phone, setPhone] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  // Set once Razorpay reports success, so clearing the cart doesn't flash the
+  // empty-cart view while the payment is verified and we navigate away.
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
 
   // Guest OTP states
   const [guestName, setGuestName] = useState("");
@@ -62,6 +103,9 @@ export default function CheckoutClient({ session }: { session: any }) {
     }
   }, [session.isLoggedIn]);
 
+  const cartPayload = () =>
+    items.map((item) => ({ productId: item.productId, variantId: item.variantId ?? null, quantity: item.quantity }));
+
   // Email OTP handlers
   const handleSendOtp = async () => {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -86,7 +130,7 @@ export default function CheckoutClient({ session }: { session: any }) {
           setGuestError(data.error || "Failed to send OTP");
         }
       }
-    } catch (err) {
+    } catch {
       setGuestError("Unexpected error");
     } finally {
       setIsSendingOtp(false);
@@ -105,11 +149,13 @@ export default function CheckoutClient({ session }: { session: any }) {
       const data = await res.json();
       if (res.ok) {
         setGuestVerified(true);
+        // Pre-fill the address name/phone from the contact details just entered.
+        setNewAddress((prev) => ({ ...prev, name: prev.name || guestName, phone: prev.phone || phone }));
         router.refresh();
       } else {
         setGuestError(data.error || "Verification failed");
       }
-    } catch (err) {
+    } catch {
       setGuestError("Unexpected error");
     } finally {
       setIsVerifyingOtp(false);
@@ -125,7 +171,7 @@ export default function CheckoutClient({ session }: { session: any }) {
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: couponCode.trim().toUpperCase(), cartTotal: subtotal }),
+        body: JSON.stringify({ code: couponCode.trim().toUpperCase(), items: cartPayload() }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -134,7 +180,7 @@ export default function CheckoutClient({ session }: { session: any }) {
       } else {
         setCouponError(data.error || "Invalid coupon");
       }
-    } catch (err) {
+    } catch {
       setCouponError("Failed to validate coupon");
     } finally {
       setIsApplyingCoupon(false);
@@ -149,12 +195,12 @@ export default function CheckoutClient({ session }: { session: any }) {
 
   const subtotal = getTotal();
   const discount = appliedCoupon?.discount || 0;
-  const shipping = subtotal > 2000 ? 0 : 100;
+  const shipping = shippingFor(subtotal);
   const total = Math.max(0, subtotal - discount + shipping);
 
   const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
-      if ((window as any).Razorpay) { resolve(true); return; }
+      if (window.Razorpay) { resolve(true); return; }
       const script = document.createElement('script');
       script.src = 'https://checkout.razorpay.com/v1/checkout.js';
       script.onload = () => resolve(true);
@@ -165,100 +211,123 @@ export default function CheckoutClient({ session }: { session: any }) {
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCheckoutError("");
+
+    const finalAddress = showNewAddress
+      ? newAddress
+      : addresses.find(a => a.id === selectedAddressId);
+
+    if (!finalAddress || !finalAddress.name || !finalAddress.street || !finalAddress.city || !finalAddress.state || !finalAddress.pincode) {
+      setCheckoutError("Please provide a complete address.");
+      return;
+    }
+    if (!/^\d{6}$/.test(finalAddress.pincode.trim())) {
+      setCheckoutError("PIN code must be 6 digits.");
+      return;
+    }
+
+    const finalPhone = finalAddress.phone || phone;
+    if (!finalPhone) {
+      setCheckoutError("Please provide a phone number for the order.");
+      return;
+    }
+
     setIsSubmitting(true);
-    
     try {
-      let finalAddress = null;
-      if (showNewAddress) {
-        finalAddress = newAddress;
-      } else {
-        finalAddress = addresses.find(a => a.id === selectedAddressId);
-      }
-
-      if (!finalAddress || !finalAddress.street || !finalAddress.city || !finalAddress.state || !finalAddress.pincode) {
-        alert("Please provide a complete address");
-        setIsSubmitting(false);
-        return;
-      }
-
-      const finalPhone = phone || finalAddress.phone;
-      if (!finalPhone) {
-        alert("Please provide a phone number for the order.");
-        setIsSubmitting(false);
-        return;
-      }
+      // Start loading the payment SDK while the order is being created.
+      const scriptPromise = loadRazorpayScript();
 
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items,
-          address: finalAddress,
-          phone: phone || finalAddress.phone || "",
-          email: email,
+          items: cartPayload(),
+          address: { ...finalAddress, phone: finalPhone },
+          phone: finalPhone,
           couponCode: appliedCoupon?.code || null,
+          expectedTotal: total,
         })
       });
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Order failed");
-      }
-      const data = await res.json();
-
-      const isLoaded = await loadRazorpayScript();
-      if (!isLoaded) {
-        alert("Razorpay SDK failed to load");
+        if (data.code === "PRICE_CHANGED" && Array.isArray(data.prices)) {
+          syncPrices(data.prices);
+          if (appliedCoupon) handleRemoveCoupon();
+        }
+        if (data.code === "COUPON_INVALID") handleRemoveCoupon();
+        setCheckoutError(data.error || "Could not place the order. Please try again.");
         setIsSubmitting(false);
         return;
       }
 
-      const options = {
+      const isLoaded = await scriptPromise;
+      if (!isLoaded || !window.Razorpay) {
+        setCheckoutError("The payment window failed to load. Please check your connection and try again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      let paymentFailed = false;
+      const rzp = new window.Razorpay({
         key: data.keyId,
         amount: data.amount,
         currency: data.currency,
         name: 'The Rebel Season',
         description: 'Order Payment',
         order_id: data.razorpayOrderId,
-        prefill: { email, contact: phone || finalAddress.phone || "" },
+        prefill: { name: finalAddress.name, email, contact: finalPhone },
         theme: { color: '#E91E63' },
-        handler: async (response: any) => {
-          const verifyRes = await fetch('/api/orders/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              orderId: data.orderId,
-            }),
-          });
-          if (verifyRes.ok) {
-            clearCart();
-            router.push(`/order-success?id=${data.orderId}`);
-          } else {
-            router.push(`/order-failed?id=${data.orderId}`);
+        handler: async (response: RazorpayResponse) => {
+          // Razorpay has taken the payment; the server double-checks it, and
+          // the webhook confirms the order even if this request never lands.
+          setConfirmingPayment(true);
+          clearCart();
+          try {
+            await fetch('/api/orders/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(response),
+            });
+          } catch (err) {
+            console.error("Payment verification request failed:", err);
           }
+          router.push(`/order-success?id=${data.orderId}`);
         },
         modal: {
           ondismiss: () => {
-            router.push(`/order-failed?id=${data.orderId}`);
+            if (paymentFailed) {
+              router.push(`/order-failed?id=${data.orderId}`);
+            } else {
+              setCheckoutError("Payment was cancelled. You can try again whenever you're ready.");
+              setIsSubmitting(false);
+            }
           }
         }
-      };
-      
-      const rzp = new (window as any).Razorpay(options);
-      rzp.on('payment.failed', function (response: any) {
-        router.push(`/order-failed?id=${data.orderId}`);
+      });
+      // Razorpay lets the customer retry inside the same window after a
+      // failed attempt, so only remember the failure here.
+      rzp.on('payment.failed', () => {
+        paymentFailed = true;
       });
       rzp.open();
 
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      alert(error.message || "Failed to place order.");
+      setCheckoutError(error instanceof Error ? error.message : "Failed to place order.");
       setIsSubmitting(false);
     }
   };
+
+  if (confirmingPayment) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center py-24 px-4" role="status" aria-live="polite">
+        <div className="w-10 h-10 border-2 border-foreground border-t-transparent rounded-full animate-spin mb-6" />
+        <h1 className="font-heading text-2xl font-medium mb-2">Payment received</h1>
+        <p className="text-sm text-muted-foreground">Confirming your order, please don&apos;t close this page…</p>
+      </div>
+    );
+  }
 
   if (items.length === 0) return <div className="text-center py-20">Your cart is empty. <Link href="/products" className="underline">Go shopping</Link></div>;
 
@@ -351,10 +420,11 @@ export default function CheckoutClient({ session }: { session: any }) {
                     </div>
                   )}
                   <Input type="text" placeholder="Full Name" required value={newAddress.name} onChange={e => setNewAddress({...newAddress, name: e.target.value})} className="w-full h-12 rounded-none bg-secondary/50 border-border col-span-2" />
+                  <Input type="tel" placeholder="Phone Number" required value={newAddress.phone} onChange={e => setNewAddress({...newAddress, phone: e.target.value})} className="w-full h-12 rounded-none bg-secondary/50 border-border col-span-2" />
                   <Input type="text" placeholder="Street Address" required value={newAddress.street} onChange={e => setNewAddress({...newAddress, street: e.target.value})} className="w-full h-12 rounded-none bg-secondary/50 border-border col-span-2" />
                   <Input type="text" placeholder="City" required value={newAddress.city} onChange={e => setNewAddress({...newAddress, city: e.target.value})} className="w-full h-12 rounded-none bg-secondary/50 border-border col-span-2 sm:col-span-1" />
                   <Input type="text" placeholder="State" required value={newAddress.state} onChange={e => setNewAddress({...newAddress, state: e.target.value})} className="w-full h-12 rounded-none bg-secondary/50 border-border col-span-2 sm:col-span-1" />
-                  <Input type="text" placeholder="PIN Code" required value={newAddress.pincode} onChange={e => setNewAddress({...newAddress, pincode: e.target.value})} className="w-full h-12 rounded-none bg-secondary/50 border-border col-span-2 sm:col-span-1" />
+                  <Input type="text" inputMode="numeric" pattern="\d{6}" maxLength={6} placeholder="PIN Code" required value={newAddress.pincode} onChange={e => setNewAddress({...newAddress, pincode: e.target.value})} className="w-full h-12 rounded-none bg-secondary/50 border-border col-span-2 sm:col-span-1" />
                 </div>
               )}
             </section>
@@ -390,6 +460,20 @@ export default function CheckoutClient({ session }: { session: any }) {
               )}
             </section>
 
+            {checkoutError && (
+              <div role="alert" className="p-4 border border-red-200 bg-red-50 text-sm text-red-700">
+                {checkoutError}
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              All sales are final: confirmed orders cannot be cancelled, returned or refunded, except for damaged or
+              incorrect items. Estimated delivery: {siteConfig.deliveryDays}. By placing this order you agree to our{" "}
+              <Link href="/terms" target="_blank" className="underline underline-offset-2">Terms</Link>,{" "}
+              <Link href="/returns" target="_blank" className="underline underline-offset-2">Cancellation &amp; Refund Policy</Link> and{" "}
+              <Link href="/shipping" target="_blank" className="underline underline-offset-2">Shipping Policy</Link>.
+            </p>
+
             <Button type="submit" disabled={isSubmitting || isCheckoutDisabled} className={`w-full h-14 rounded-none font-semibold uppercase tracking-widest text-sm bg-foreground text-background hover:bg-foreground/90 transition-colors ${isCheckoutDisabled ? "opacity-50 cursor-not-allowed" : ""}`}>
               {isSubmitting ? "Processing..." : `Pay Now ₹${total.toLocaleString("en-IN")}`}
             </Button>
@@ -408,10 +492,10 @@ export default function CheckoutClient({ session }: { session: any }) {
             <h2 className="font-heading text-xl font-medium mb-6">Order Summary</h2>
             
             <div className="space-y-4 mb-6 pb-6 border-b border-border/50">
-              {items.map((item, idx) => (
-                <div key={idx} className="flex gap-4 items-center">
+              {items.map((item) => (
+                <div key={`${item.productId}-${item.size || "default"}`} className="flex gap-4 items-center">
                   <div className="relative w-16 aspect-[3/4] bg-background">
-                    <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${item.image}')` }} />
+                    <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${cldImage(item.image, 200)}')` }} />
                     <span className="absolute -top-2 -right-2 bg-foreground text-background w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium">{item.quantity}</span>
                   </div>
                   <div className="flex-1 text-sm">

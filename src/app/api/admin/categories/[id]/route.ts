@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { revalidateCatalog } from "@/lib/cache";
 import { getCategoryById } from "@/lib/dal/categories";
 
 export async function PUT(
@@ -26,6 +27,7 @@ export async function PUT(
       },
     });
 
+    revalidateCatalog();
     return NextResponse.json(updatedCategory);
   } catch (error: any) {
     console.error("Error updating category:", error);
@@ -61,6 +63,7 @@ export async function DELETE(
     await prisma.category.delete({
       where: { id },
     });
+    revalidateCatalog();
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
-import { getCustomerSession } from "@/lib/auth";
+import { checkOtp, getCustomerSession, otpErrorMessage, setDisplayNameCookie } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -9,42 +10,56 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    if (!(await checkRateLimit(ip, "checkout_verify", 5))) {
+    if (!(await checkRateLimit(ip, "checkout_verify", 10))) {
       return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
     }
 
     const body = await request.json().catch(() => null);
-    if (!body || !body.otp || !body.email) {
+    if (!body || typeof body.otp !== "string" || typeof body.email !== "string") {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const { otp, name, email, phone } = body;
+    const { otp, name, phone } = body;
+    const email = body.email.toLowerCase().trim();
     const session = await getCustomerSession();
 
-    if (!session.pendingOtp || session.pendingOtp !== otp) {
-      return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 400 });
+    // The OTP is bound to the email it was sent to, so it cannot be used to
+    // create an account for a different address.
+    const result = checkOtp(session, "checkout", otp, email);
+    if (result !== "ok") {
+      await session.save();
+      return NextResponse.json({ error: otpErrorMessage(result) }, { status: 400 });
     }
 
-    const dummyPassword = await bcrypt.hash(Math.random().toString(36).slice(-8), 10);
-    const finalName = name?.trim() || email.split("@")[0] || "Guest User";
+    // Guest accounts get an unguessable password; the customer can set their
+    // own later through "Forgot password".
+    const randomPassword = await bcrypt.hash(randomBytes(24).toString("hex"), 10);
+    const finalName = (typeof name === "string" && name.trim()) || email.split("@")[0] || "Guest User";
 
-    const user = await prisma.user.create({
-      data: {
-        name: finalName,
-        email: email.toLowerCase().trim(),
-        phone: phone?.trim() || null,
-        password: dummyPassword,
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        name: finalName.slice(0, 100),
+        email,
+        phone: typeof phone === "string" && phone.trim() ? phone.trim().slice(0, 20) : null,
+        password: randomPassword,
         role: "CUSTOMER",
       },
     });
 
-    session.pendingOtp = undefined;
+    if (user.role !== "CUSTOMER") {
+      await session.save();
+      return NextResponse.json({ error: "Please log in to continue." }, { status: 403 });
+    }
+
     session.userId = user.id;
     session.email = user.email;
     session.name = user.name;
     session.role = "CUSTOMER";
     session.isLoggedIn = true;
     await session.save();
+    await setDisplayNameCookie(user.name);
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { MAX_QTY_PER_LINE } from "@/lib/pricing";
 
 export type CartItem = {
   productId: string;
@@ -20,6 +21,7 @@ type CartContextType = {
   removeItem: (productId: string, size?: string) => void;
   updateQuantity: (productId: string, size: string | undefined, quantity: number) => void;
   clearCart: () => void;
+  syncPrices: (prices: { productId: string; variantId: string | null; price: number }[]) => void;
   getTotal: () => number;
   getItemCount: () => number;
 };
@@ -32,7 +34,10 @@ function loadCart(): CartItem[] {
   if (typeof window === "undefined") return [];
   try {
     const stored = localStorage.getItem(CART_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    const parsed = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((i) => i && typeof i.productId === "string" && Number.isInteger(i.quantity) && i.quantity > 0)
+      : [];
   } catch {
     return [];
   }
@@ -40,7 +45,11 @@ function loadCart(): CartItem[] {
 
 function saveCart(items: CartItem[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  try {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // Storage full or blocked (private mode): the cart still works for this visit.
+  }
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -70,11 +79,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const updated = [...prev];
         updated[existingIndex] = {
           ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + newItem.quantity,
+          quantity: Math.min(MAX_QTY_PER_LINE, updated[existingIndex].quantity + newItem.quantity),
         };
         return updated;
       }
-      return [...prev, newItem];
+      return [...prev, { ...newItem, quantity: Math.min(MAX_QTY_PER_LINE, newItem.quantity) }];
     });
   }, []);
 
@@ -93,7 +102,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setItems((prev) =>
         prev.map((item) =>
           item.productId === productId && item.size === size
-            ? { ...item, quantity }
+            ? { ...item, quantity: Math.min(MAX_QTY_PER_LINE, quantity) }
             : item
         )
       );
@@ -103,6 +112,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => {
     setItems([]);
+  }, []);
+
+  // Apply server-confirmed prices (e.g. after an admin changed a price).
+  const syncPrices = useCallback((prices: { productId: string; variantId: string | null; price: number }[]) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        const match = prices.find(
+          (p) => p.productId === item.productId && (p.variantId ?? undefined) === (item.variantId ?? undefined)
+        );
+        return match ? { ...item, price: match.price } : item;
+      })
+    );
   }, []);
 
   const getTotal = useCallback(() => {
@@ -115,7 +136,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, updateQuantity, clearCart, getTotal, getItemCount }}
+      value={{ items, addItem, removeItem, updateQuantity, clearCart, syncPrices, getTotal, getItemCount }}
     >
       {children}
     </CartContext.Provider>

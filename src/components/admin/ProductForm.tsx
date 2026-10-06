@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Upload, X, Loader2, Trash2 } from "lucide-react";
+import { uploadToCloudinary } from "@/lib/cloudinary-upload";
 
 type Category = {
   id: string;
@@ -73,23 +74,25 @@ export default function ProductForm({ initialData, categories }: ProductFormProp
     if (!file) return;
 
     setUploading(true);
-    const form = new FormData();
-    form.append("file", file);
-
     try {
-      const res = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: form,
-      });
-      const data = await res.json();
-      if (data.url) {
-        setFormData(prev => ({ ...prev, images: [...prev.images, data.url] }));
-      }
+      const url = await uploadToCloudinary(file, "rebel-season/products");
+      setFormData(prev => ({ ...prev, images: [...prev.images, url] }));
     } catch (err) {
       console.error("Upload failed", err);
+      setError(err instanceof Error ? err.message : "Image upload failed");
     } finally {
+      e.target.value = "";
       setUploading(false);
     }
+  };
+
+  // The first image is the cover shown on product cards and as the main photo.
+  const makeCover = (index: number) => {
+    setFormData(prev => {
+      const images = [...prev.images];
+      const [picked] = images.splice(index, 1);
+      return { ...prev, images: [picked, ...images] };
+    });
   };
 
   const removeImage = (index: number) => {
@@ -310,10 +313,24 @@ export default function ProductForm({ initialData, categories }: ProductFormProp
               <button
                 type="button"
                 onClick={() => removeImage(i)}
-                className="absolute top-2 right-2 bg-white/80 p-1 rounded-full text-red-600 hover:bg-white"
+                aria-label="Remove image"
+                className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full text-red-600 shadow-sm hover:bg-white"
               >
                 <X size={16} />
               </button>
+              {i === 0 ? (
+                <span className="absolute bottom-2 left-2 rounded bg-black/80 px-2 py-0.5 text-[11px] font-medium text-white">
+                  Cover
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => makeCover(i)}
+                  className="absolute bottom-2 left-2 rounded bg-white/90 px-2 py-1 text-[11px] font-medium text-gray-800 shadow-sm hover:bg-white"
+                >
+                  Set as cover
+                </button>
+              )}
             </div>
           ))}
           <label className="relative aspect-[3/4] bg-gray-50 rounded-md border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors">

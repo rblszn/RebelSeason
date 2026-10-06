@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Minus, Plus, X } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
+import { cldImage } from "@/lib/images";
+import { MAX_QTY_PER_LINE } from "@/lib/pricing";
 
 export default function CartPage() {
   const { items, updateQuantity, removeItem, getTotal } = useCart();
@@ -31,7 +33,7 @@ export default function CartPage() {
                   {/* Product Info */}
                   <div className="col-span-6 flex gap-4 w-full">
                     <Link href={`/products/${item.slug}`} className="w-20 sm:w-24 aspect-[3/4] bg-secondary shrink-0 relative block">
-                      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${item.image}')` }} />
+                      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${cldImage(item.image, 200)}')` }} />
                     </Link>
                     <div className="flex flex-col pt-1">
                       <Link href={`/products/${item.slug}`} className="font-medium hover:underline underline-offset-4 mb-1 text-sm sm:text-base">
@@ -66,6 +68,7 @@ export default function CartPage() {
                       <span className="flex-1 text-center text-sm font-medium">{item.quantity}</span>
                       <button 
                         onClick={() => updateQuantity(item.productId, item.size, item.quantity + 1)}
+                        disabled={item.quantity >= MAX_QTY_PER_LINE}
                         className="flex-1 flex justify-center items-center text-muted-foreground hover:text-foreground"
                       >
                         <Plus className="w-3 h-3" />

@@ -7,11 +7,10 @@ export default async function CheckoutPage() {
   const session = await getCustomerSession();
 
   const serializedSession = {
-    userId: session.userId,
-    email: session.email,
-    name: session.name,
-    role: session.role,
-    isLoggedIn: session.isLoggedIn,
+    userId: session.userId ?? "",
+    email: session.email ?? "",
+    name: session.name ?? "",
+    isLoggedIn: Boolean(session.isLoggedIn && session.userId),
   };
 
   return (

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCustomerSession } from "@/lib/auth";
+import { getCustomerSession, issueOtp } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/mail";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -14,33 +14,35 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => null);
-    if (!body || !body.email) {
+    if (!body || typeof body.email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    const { email } = body;
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = body.email.toLowerCase().trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || normalizedEmail.length > 254) {
+      return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
+    }
 
     const existingUser = await prisma.user.findUnique({
       where: { email: normalizedEmail },
+      select: { id: true },
     });
 
     if (existingUser) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: "An account with this email already exists. Please log in.",
-        exists: true 
+        exists: true,
       }, { status: 400 });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const session = await getCustomerSession();
+    const otp = issueOtp(session, "checkout", normalizedEmail);
     const emailSent = await sendOtpEmail(normalizedEmail, otp);
 
     if (!emailSent) {
       return NextResponse.json({ error: "Failed to send verification email." }, { status: 500 });
     }
 
-    const session = await getCustomerSession();
-    session.pendingOtp = otp;
     await session.save();
 
     return NextResponse.json({

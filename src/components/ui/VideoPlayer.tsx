@@ -2,8 +2,11 @@
 
 import { useRef, useState, useEffect } from "react";
 import { Play, Pause } from "lucide-react";
+import { cldVideo, cldVideoPoster } from "@/lib/images";
 
-export function VideoPlayer({ url, className }: { url: string; className?: string }) {
+export function VideoPlayer({ url: sourceUrl, className }: { url: string; className?: string }) {
+  // Compressed, resized rendition instead of the original upload.
+  const url = cldVideo(sourceUrl);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -12,8 +15,8 @@ export function VideoPlayer({ url, className }: { url: string; className?: strin
   // Generate a stable unique ID for this instance
   const videoId = useRef(Math.random().toString(36)).current;
 
-  // Cloudinary trick: Change .mp4 to .jpg for an instant thumbnail
-  const posterUrl = url.replace(/\.(mp4|webm|ogg)$/i, ".jpg");
+  // Cloudinary serves a frame of the video as a small poster image.
+  const posterUrl = cldVideoPoster(sourceUrl);
 
   useEffect(() => {
     const handleGlobalPlay = (e: Event) => {

@@ -6,33 +6,24 @@ import { NewArrivalsProducts } from "@/components/home/NewArrivalsProducts";
 import { OurProducts } from "@/components/home/OurProducts";
 import { ReelsCarousel } from "@/components/home/ReelsCarousel";
 import { Testimonials } from "@/components/home/Testimonials";
+import { getHomePageData } from "@/lib/dal/catalog";
 
-import { getSettings } from "@/lib/dal/settings";
-import { getTrendingProducts, getNewArrivals, getAllCategories, getAllProducts } from "@/lib/dal";
-
-export const revalidate = 3600; // revalidate every hour
+// Served from cache; refreshed when the catalog changes or at most hourly.
+export const revalidate = 3600;
 
 export default async function HomePage() {
-  const [trendingProducts, newArrivals, categories, allProducts, settings] = await Promise.all([
-    getTrendingProducts(8),
-    getNewArrivals(8),
-    getAllCategories(),
-    getAllProducts({ limit: 8 }),
-    getSettings(),
-  ]);
+  const { newArrivals, trending, categories, settings } = await getHomePageData();
 
   return (
     <>
       <Hero />
       <NewArrivalsProducts products={newArrivals} />
       <ShopByCategory categories={categories} />
-      <TrendingProducts products={trendingProducts} />
-      <OurProducts products={allProducts} />
+      <TrendingProducts products={trending} />
+      <OurProducts products={newArrivals} />
       <HomeCarousel />
       <ReelsCarousel settings={settings} />
       <Testimonials settings={settings} />
     </>
   );
 }
-
-

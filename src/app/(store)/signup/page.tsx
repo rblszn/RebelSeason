@@ -135,10 +135,11 @@ export default function SignupPage() {
               <input
                 type="password"
                 required
+                minLength={8}
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 className="w-full p-2.5 border border-border rounded-md focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all"
-                placeholder="••••••••"
+                placeholder="At least 8 characters"
               />
             </div>
 

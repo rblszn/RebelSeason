@@ -1,26 +1,36 @@
 import { NextResponse } from "next/server";
-import { v2 as cloudinary } from "cloudinary";
+import { cloudinary } from "@/lib/cloudinary";
 
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+export const dynamic = "force-dynamic";
 
-export async function GET() {
+// Admin-only (enforced by the proxy). Signs a direct browser → Cloudinary upload
+// so files never pass through our server functions.
+const ALLOWED_FOLDERS = new Set([
+  "rebel-season/products",
+  "rebel-season/categories",
+  "rebel-season/storefront",
+]);
+
+export async function GET(request: Request) {
   try {
-    const timestamp = Math.round(new Date().getTime() / 1000);
+    const folder = new URL(request.url).searchParams.get("folder") || "rebel-season/storefront";
+    if (!ALLOWED_FOLDERS.has(folder)) {
+      return NextResponse.json({ error: "Invalid upload folder" }, { status: 400 });
+    }
+
+    const timestamp = Math.round(Date.now() / 1000);
     const signature = cloudinary.utils.api_sign_request(
-      { timestamp, folder: "rebel-season/storefront" },
+      { timestamp, folder },
       process.env.CLOUDINARY_API_SECRET!
     );
-    return NextResponse.json({ 
-      timestamp, 
-      signature, 
-      cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, 
-      apiKey: process.env.CLOUDINARY_API_KEY 
+    return NextResponse.json({
+      timestamp,
+      signature,
+      folder,
+      cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+      apiKey: process.env.CLOUDINARY_API_KEY,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to generate signature" }, { status: 500 });
   }
 }

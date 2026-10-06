@@ -1,4 +1,5 @@
 import { getOrderById } from '@/lib/dal/orders';
+import { getCustomerSession } from '@/lib/auth';
 import OrderSuccessClient from './OrderSuccessClient';
 import { notFound, redirect } from 'next/navigation';
 
@@ -11,41 +12,44 @@ export default async function OrderSuccessPage({
 }) {
   const params = await searchParams;
   const id = params?.id;
-  
+
   if (!id) {
     redirect('/');
   }
 
-  const order = await getOrderById(id);
-
-  if (!order) {
-    notFound();
-  }
-
-  const { getCustomerSession } = await import('@/lib/auth');
   const session = await getCustomerSession();
-  
-  if (order.customerId !== session.userId) {
+  if (!session.isLoggedIn || !session.userId) {
     redirect('/login');
   }
 
-  if (order.status === 'PENDING' || order.status === 'CANCELLED') {
-    // Order not yet paid or was cancelled
+  const order = await getOrderById(id);
+
+  // Treat other customers' orders as not found rather than confirming they exist.
+  if (!order || order.customerId !== session.userId) {
+    notFound();
   }
 
-  // Serialize order for client component
   const serializedOrder = {
-    ...order,
-    total: Number(order.total),
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    subtotal: order.subtotal,
+    shipping: order.shipping,
+    discount: order.discount,
+    total: order.total,
+    couponCode: order.couponCode,
+    shippingAddress: order.shippingAddress,
     createdAt: order.createdAt.toISOString(),
-    updatedAt: order.updatedAt.toISOString(),
-    items: order.items.map((item: any) => ({
-      ...item,
-      price: Number(item.price),
-      product: item.product ? {
-        ...item.product,
-        price: Number(item.product.price),
-      } : undefined
+    payment: order.payment
+      ? { status: order.payment.status, razorpayPaymentId: order.payment.razorpayPaymentId }
+      : null,
+    items: order.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      variantName: item.variantName,
+      quantity: item.quantity,
+      price: item.price,
+      image: item.image,
     })),
   };
 

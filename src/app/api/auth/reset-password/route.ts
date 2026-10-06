@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { getCustomerSession } from "@/lib/auth";
+import { checkOtp, getCustomerSession, otpErrorMessage } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    
+
     // Strict rate limit: 5 requests per 15 mins for reset verification
     if (!(await checkRateLimit(ip, "reset_password", 5))) {
       return NextResponse.json(
@@ -25,27 +25,26 @@ export async function POST(request: Request) {
     }
 
     const { otp, password } = body;
-    const session = await getCustomerSession();
-
-    if (!session.resetEmail || !session.resetOtp) {
-      return NextResponse.json({ error: "Session expired. Please request a new password reset." }, { status: 400 });
+    if (password.length < 8 || password.length > 128) {
+      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
 
-    if (session.resetOtp !== otp.trim()) {
-      return NextResponse.json({ error: "Invalid OTP code." }, { status: 400 });
+    const session = await getCustomerSession();
+    const email = session.otp?.purpose === "reset" ? session.otp.email : null;
+
+    const result = checkOtp(session, "reset", otp);
+    if (result !== "ok" || !email) {
+      await session.save();
+      return NextResponse.json({ error: otpErrorMessage(result === "ok" ? "missing" : result) }, { status: 400 });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Update the user's password
-    await prisma.user.update({
-      where: { email: session.resetEmail },
+    await prisma.user.updateMany({
+      where: { email, role: "CUSTOMER" },
       data: { password: hashedPassword },
     });
 
-    // Clear reset fields from session
-    session.resetEmail = undefined;
-    session.resetOtp = undefined;
     await session.save();
 
     return NextResponse.json({

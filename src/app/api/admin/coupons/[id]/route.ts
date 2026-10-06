@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
+import { validateCoupon } from "@/lib/coupon-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params;
     const body = await request.json();
     const { code, name, type, value, maxLimit, appliesTo, isActive, expiresAt } = body;
+    const invalid = validateCoupon({ code, type, value, maxLimit, appliesTo });
+    if (invalid) {
+      return NextResponse.json({ error: invalid }, { status: 400 });
+    }
 
     const coupon = await prisma.coupon.update({
       where: { id },

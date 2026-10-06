@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAllProducts } from "@/lib/dal/products";
+import { revalidateCatalog } from "@/lib/cache";
+import { productData, productInputSchema, prismaErrorResponse } from "@/lib/admin-products";
 
 export async function GET() {
   try {
@@ -14,25 +16,28 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const data = await req.json();
-    const { variants, stock, ...productData } = data;
-    
+    const parsed = productInputSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid product data" }, { status: 400 });
+    }
+    const input = parsed.data;
+
     const product = await prisma.product.create({
       data: {
-        ...productData,
-        stock: stock || 0,
-        variants: productData.hasVariants && variants && variants.length > 0 ? {
-          create: variants
-        } : undefined
+        ...productData(input),
+        variants: input.hasVariants && input.variants.length > 0 ? { create: input.variants } : undefined,
       },
       include: {
         category: true,
-        variants: true
-      }
+        variants: true,
+      },
     });
-    
+
+    revalidateCatalog();
     return NextResponse.json(product);
   } catch (error) {
+    const known = prismaErrorResponse(error);
+    if (known) return NextResponse.json({ error: known.error }, { status: known.status });
     console.error("Error creating product:", error);
     return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
   }

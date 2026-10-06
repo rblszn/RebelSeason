@@ -1,4 +1,5 @@
 import { VideoPlayer } from "@/components/ui/VideoPlayer";
+import { cldImage, isVideoUrl } from "@/lib/images";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 
@@ -33,12 +34,12 @@ export function ReelsCarousel({ settings }: { settings?: Record<string, string> 
               key={i}
               className="relative w-[180px] sm:w-[220px] lg:w-[260px] aspect-[9/16] rounded-[24px] overflow-hidden group flex-shrink-0 snap-center bg-secondary shadow-sm"
             >
-              {url.match(/\.(mp4|webm|ogg)$/i) ? (
+              {isVideoUrl(url) ? (
                 <VideoPlayer url={url} className="w-full h-full" />
               ) : (
                 <div 
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-105"
-                  style={{ backgroundImage: `url('${url}')` }}
+                  style={{ backgroundImage: `url('${cldImage(url, 400)}')` }}
                 />
               )}
               <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-300 pointer-events-none" />

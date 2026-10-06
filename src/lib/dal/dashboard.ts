@@ -42,16 +42,40 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 /**
- * Provide mock recent sales data for the admin dashboard recharts line chart.
+ * Paid sales for the last 7 days (today included), bucketed by day in IST.
  */
-export function getMockSalesChartData(): SalesChartPoint[] {
-  return [
-    { date: "Mon", sales: 18500, orders: 4, revenue: 18500 },
-    { date: "Tue", sales: 24200, orders: 6, revenue: 24200 },
-    { date: "Wed", sales: 19800, orders: 5, revenue: 19800 },
-    { date: "Thu", sales: 31400, orders: 8, revenue: 31400 },
-    { date: "Fri", sales: 28900, orders: 7, revenue: 28900 },
-    { date: "Sat", sales: 42500, orders: 11, revenue: 42500 },
-    { date: "Sun", sales: 36000, orders: 9, revenue: 36000 },
-  ];
+export async function getSalesChartData(): Promise<SalesChartPoint[]> {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const nowIst = new Date(Date.now() + IST_OFFSET_MS);
+  const todayStartIst = Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate());
+  const since = new Date(todayStartIst - 6 * DAY_MS - IST_OFFSET_MS);
+
+  const payments = await prisma.payment.findMany({
+    where: { status: "CAPTURED", capturedAt: { gte: since } },
+    select: { amount: true, capturedAt: true },
+  });
+
+  const days: SalesChartPoint[] = [];
+  for (let i = 0; i < 7; i++) {
+    const dayStart = todayStartIst - (6 - i) * DAY_MS;
+    days.push({
+      date: new Date(dayStart).toLocaleDateString("en-IN", { weekday: "short", timeZone: "UTC" }),
+      sales: 0,
+      orders: 0,
+      revenue: 0,
+    });
+  }
+
+  for (const p of payments) {
+    if (!p.capturedAt) continue;
+    const ist = p.capturedAt.getTime() + IST_OFFSET_MS;
+    const index = 6 - Math.floor((todayStartIst + DAY_MS - 1 - ist) / DAY_MS);
+    if (index < 0 || index > 6) continue;
+    days[index].sales += p.amount;
+    days[index].revenue += p.amount;
+    days[index].orders += 1;
+  }
+
+  return days;
 }

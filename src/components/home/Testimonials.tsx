@@ -1,5 +1,6 @@
 import { Star } from "lucide-react";
 import { VideoPlayer } from "@/components/ui/VideoPlayer";
+import { cldImage, isVideoUrl } from "@/lib/images";
 
 export function Testimonials({ settings }: { settings?: Record<string, string> }) {
   let testimonials: string[] = [];
@@ -31,12 +32,12 @@ export function Testimonials({ settings }: { settings?: Record<string, string> }
               key={i}
               className="relative w-[220px] sm:w-[260px] lg:w-[300px] aspect-[4/5] rounded-[24px] overflow-hidden flex-shrink-0 snap-center group shadow-sm"
             >
-              {url.match(/\.(mp4|webm|ogg)$/i) ? (
+              {isVideoUrl(url) ? (
                 <VideoPlayer url={url} className="w-full h-full" />
               ) : (
                 <div 
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-                  style={{ backgroundImage: `url('${url}')` }}
+                  style={{ backgroundImage: `url('${cldImage(url, 400)}')` }}
                 />
               )}
             </div>

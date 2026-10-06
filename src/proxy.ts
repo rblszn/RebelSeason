@@ -2,8 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getIronSession, nextProxyCookies } from "iron-session";
 import { adminSessionOptions, AdminSessionData } from "@/lib/auth";
 
-import { checkRateLimit } from "@/lib/rate-limit";
-
 /**
  * Next.js 16 Proxy (Middleware) to protect `/admin` and `/api/admin` routes.
  *
@@ -37,15 +35,6 @@ export async function proxy(request: NextRequest) {
       return NextResponse.json(
         { error: "Unauthorized: Admin access required" },
         { status: 401 }
-      );
-    }
-    
-    // Check Rate limit for Admin APIs: 30 requests per minute
-    const ip = request.headers.get("x-forwarded-for") || "127.0.0.1";
-    if (!(await checkRateLimit(ip, "admin_api", 30, 60000))) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { status: 429 }
       );
     }
 

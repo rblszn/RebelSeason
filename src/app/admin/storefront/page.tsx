@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Upload, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { uploadToCloudinary } from "@/lib/cloudinary-upload";
 
 export default function StorefrontSettings() {
   const [loading, setLoading] = useState(true);
@@ -33,39 +34,18 @@ export default function StorefrontSettings() {
     setUploading(type);
 
     try {
-      // 1. Get Signature
-      const sigRes = await fetch("/api/admin/cloudinary-signature");
-      if (!sigRes.ok) throw new Error("Signature failed");
-      const { signature, timestamp, cloudName, apiKey } = await sigRes.json();
-
-      // 2. Upload direct to Cloudinary
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("api_key", apiKey);
-      formData.append("timestamp", timestamp.toString());
-      formData.append("signature", signature);
-      formData.append("folder", "rebel-season/storefront");
-
-      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      
-      const data = await uploadRes.json();
-      if (!data.secure_url) {
-        console.error("Cloudinary Error Details:", data);
-        throw new Error(data.error?.message || "Upload failed");
-      }
+      const secureUrl = await uploadToCloudinary(file, "rebel-season/storefront");
 
       if (type === 'reels') {
-        setReels(prev => [...prev, data.secure_url]);
+        setReels(prev => [...prev, secureUrl]);
       } else {
-        setTestimonials(prev => [...prev, data.secure_url]);
+        setTestimonials(prev => [...prev, secureUrl]);
       }
     } catch (err) {
       console.error(err);
-      alert("Upload failed. Make sure the file is not corrupted.");
+      alert(err instanceof Error ? `Upload failed: ${err.message}` : "Upload failed. Make sure the file is not corrupted.");
     } finally {
+      e.target.value = "";
       setUploading(null);
     }
   };
@@ -114,7 +94,8 @@ export default function StorefrontSettings() {
           )}
           <button 
             onClick={() => removeMedia(i, type)}
-            className="absolute top-2 right-2 bg-white/80 p-1.5 rounded-full text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label="Remove"
+            className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full text-red-600 shadow-sm transition-opacity lg:opacity-0 lg:group-hover:opacity-100"
           >
             <Trash2 size={16} />
           </button>

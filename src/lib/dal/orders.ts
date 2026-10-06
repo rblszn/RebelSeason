@@ -2,7 +2,9 @@ import { prisma } from "@/lib/db";
 import { OrderStatus, Prisma } from "@prisma/client";
 
 export const orderInclude = {
-  customer: true,
+  // Never select the whole user row here: these orders are passed to client
+  // components and would leak the password hash into the page payload.
+  customer: { select: { id: true, name: true, email: true, phone: true } },
   items: true,
   payment: true,
 } satisfies Prisma.OrderInclude;
@@ -16,7 +18,30 @@ export interface GetOrdersOptions {
   skip?: number;
   status?: OrderStatus;
   customerId?: string;
+  /** Matches order number, customer name/email/phone or Razorpay payment/order id. */
+  search?: string;
   orderBy?: Prisma.OrderOrderByWithRelationInput;
+}
+
+function orderWhere(options?: GetOrdersOptions): Prisma.OrderWhereInput {
+  const { status, customerId } = options || {};
+  const search = options?.search?.trim();
+  return {
+    ...(status ? { status } : {}),
+    ...(customerId ? { customerId } : {}),
+    ...(search
+      ? {
+          OR: [
+            { orderNumber: { contains: search, mode: "insensitive" } },
+            { customerName: { contains: search, mode: "insensitive" } },
+            { customerEmail: { contains: search, mode: "insensitive" } },
+            { customerPhone: { contains: search } },
+            { payment: { razorpayPaymentId: { equals: search } } },
+            { payment: { razorpayOrderId: { equals: search } } },
+          ],
+        }
+      : {}),
+  };
 }
 
 /**
@@ -25,13 +50,10 @@ export interface GetOrdersOptions {
 export async function getAllOrders(
   options?: GetOrdersOptions
 ): Promise<OrderWithRelations[]> {
-  const { limit, skip, status, customerId, orderBy } = options || {};
+  const { limit, skip, orderBy } = options || {};
 
   return prisma.order.findMany({
-    where: {
-      ...(status ? { status } : {}),
-      ...(customerId ? { customerId } : {}),
-    },
+    where: orderWhere(options),
     include: orderInclude,
     orderBy: orderBy || { createdAt: "desc" },
     ...(skip !== undefined ? { skip } : {}),
@@ -45,13 +67,8 @@ export async function getAllOrders(
 export async function getOrdersCount(
   options?: GetOrdersOptions
 ): Promise<number> {
-  const { status, customerId } = options || {};
-
   return prisma.order.count({
-    where: {
-      ...(status ? { status } : {}),
-      ...(customerId ? { customerId } : {}),
-    },
+    where: orderWhere(options),
   });
 }
 

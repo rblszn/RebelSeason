@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { ProductCard } from "@/components/product/ProductCard";
-import { ProductWithRelations } from "@/lib/dal";
+import type { ProductCardData } from "@/lib/dal/catalog";
 
 interface NewArrivalsProductsProps {
-  products: ProductWithRelations[];
+  products: ProductCardData[];
 }
 
 export function NewArrivalsProducts({ products }: NewArrivalsProductsProps) {

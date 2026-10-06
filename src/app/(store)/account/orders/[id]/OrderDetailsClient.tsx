@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { cldImage } from "@/lib/images";
 import { ArrowLeft, ExternalLink, Package } from "lucide-react";
 
 export default function OrderDetailsClient({ order }: { order: any }) {
@@ -68,7 +68,8 @@ export default function OrderDetailsClient({ order }: { order: any }) {
                 <div key={item.id} className="p-6 flex gap-6">
                   <div className="w-20 h-24 bg-secondary rounded-md overflow-hidden relative flex-shrink-0">
                     {item.image ? (
-                      <Image src={item.image} alt={item.name} fill className="object-cover" />
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={cldImage(item.image, 200)} alt={item.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">No img</div>
                     )}
