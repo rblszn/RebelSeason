@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
-import { User, ShoppingBag, Menu, X } from "lucide-react";
+import { User, ShoppingBag, Menu, X, ChevronDown } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 
 const DISPLAY_NAME_COOKIE = "rs_display_name";
@@ -21,7 +21,7 @@ function readDisplayName(): string | null {
   }
 }
 
-export type NavCategory = { name: string; slug: string };
+export type NavCategory = { name: string; slug: string; children: { name: string; slug: string }[] };
 
 export function Header({ categories }: { categories: NavCategory[] }) {
   const pathname = usePathname();
@@ -31,6 +31,7 @@ export function Header({ categories }: { categories: NavCategory[] }) {
 
   const isHome = pathname === "/";
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [openDepartment, setOpenDepartment] = useState<string | null>(null);
   const { getItemCount } = useCart();
   const itemCount = getItemCount();
 
@@ -49,7 +50,23 @@ export function Header({ categories }: { categories: NavCategory[] }) {
             {/* Left: Nav Links */}
             <nav className="hidden md:flex items-center gap-6 text-[12px] font-medium text-foreground flex-1">
               {categories.map((c) => (
-                <Link key={c.slug} href={`/categories/${c.slug}`} className="hover:text-muted-foreground transition-colors uppercase tracking-wide">{c.name}</Link>
+                <div key={c.slug} className="group relative flex h-16 items-center">
+                  <Link href={`/categories/${c.slug}`} className="hover:text-muted-foreground transition-colors uppercase tracking-wide">{c.name}</Link>
+                  {c.children.length > 0 && (
+                    <div className="invisible absolute left-0 top-full z-50 opacity-0 transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                      <ul className="min-w-[220px] border border-border bg-background py-3 shadow-lg">
+                        {c.children.map((child) => (
+                          <li key={child.slug}>
+                            <Link href={`/categories/${child.slug}`} className="block px-5 py-2 text-[12px] font-normal normal-case tracking-normal text-foreground hover:bg-secondary">{child.name}</Link>
+                          </li>
+                        ))}
+                        <li className="mt-1 border-t border-border pt-1">
+                          <Link href={`/categories/${c.slug}`} className="block px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-foreground hover:bg-secondary">Shop all {c.name}</Link>
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
               ))}
             </nav>
 
@@ -110,12 +127,37 @@ export function Header({ categories }: { categories: NavCategory[] }) {
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-background/95 backdrop-blur-md z-40 flex flex-col pt-24 px-6 md:hidden">
-          <nav className="flex flex-col space-y-8 text-xl font-medium items-center text-center mt-12">
-            {categories.map((c) => (
-              <Link key={c.slug} href={`/categories/${c.slug}`} onClick={() => setIsMobileMenuOpen(false)} className="hover:text-muted-foreground transition-colors uppercase tracking-wide">{c.name}</Link>
-            ))}
-            
-            
+          <nav className="flex flex-col space-y-6 text-xl font-medium items-center text-center mt-8 overflow-y-auto pb-10">
+            {categories.map((c) => {
+              const isOpen = openDepartment === c.slug;
+              return (
+                <div key={c.slug} className="flex flex-col items-center">
+                  <div className="flex items-center gap-2">
+                    <Link href={`/categories/${c.slug}`} onClick={() => setIsMobileMenuOpen(false)} className="hover:text-muted-foreground transition-colors uppercase tracking-wide">{c.name}</Link>
+                    {c.children.length > 0 && (
+                      <button
+                        type="button"
+                        aria-expanded={isOpen}
+                        aria-label={`Show ${c.name} categories`}
+                        onClick={() => setOpenDepartment(isOpen ? null : c.slug)}
+                        className="p-1 text-muted-foreground"
+                      >
+                        <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                      </button>
+                    )}
+                  </div>
+                  {isOpen && (
+                    <ul className="mt-4 flex flex-col space-y-3 text-base font-normal text-muted-foreground">
+                      {c.children.map((child) => (
+                        <li key={child.slug}>
+                          <Link href={`/categories/${child.slug}`} onClick={() => setIsMobileMenuOpen(false)} className="hover:text-foreground transition-colors">{child.name}</Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
           </nav>
         </div>
       )}

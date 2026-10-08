@@ -48,6 +48,16 @@ enum CouponAppliesTo {
   MRP
 }
 
+// The four storefront departments. Every category carries the type of the
+// department it belongs to; the type decides which attributes (size, colour,
+// fabric/material, shape, finish, dimensions) a product has to provide.
+enum ProductType {
+  CLOTHING
+  BAGS
+  JEWELLERY
+  NAIL_EXTENSIONS
+}
+
 //  User & Address 
 
 model User {
@@ -89,18 +99,26 @@ model Address {
 
 //  Category 
 
+// Two levels: a department (parentId = null, e.g. Clothing) and its
+// categories (e.g. Tops, Dresses). Products belong to a category.
 model Category {
-  id          String  @id @default(cuid())
+  id          String      @id @default(cuid())
   name        String
-  slug        String  @unique
+  slug        String      @unique
   description String?
   image       String?
+  type        ProductType @default(CLOTHING)
+  parentId    String?
+  sortOrder   Int         @default(100)
 
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children Category[] @relation("CategoryTree")
   products Product[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([parentId])
   @@map("categories")
 }
 
@@ -124,7 +142,11 @@ model Product {
   isFeatured       Boolean  @default(false)
   stock            Int      @default(0)
   hasVariants      Boolean  @default(false)
-  material         String?
+  material         String? // Fabric for clothing
+  color            String? // Colour (clothing, bags) or colour / finish (jewellery)
+  shape            String? // Nail extensions
+  finish           String? // Nail extensions
+  dimensions       String? // Bags: size as dimensions, e.g. "30 x 12 x 25 cm"
   careInstructions String?
   features         String[]
   createdAt        DateTime @default(now())
@@ -135,13 +157,14 @@ model Product {
   orderItems OrderItem[]
   reviews    Review[]
 
+  @@index([categoryId])
   @@map("products")
 }
 
 model ProductVariant {
   id        String @id @default(cuid())
   productId   String
-  size      String // S, M, L, XL, XXL
+  size      String // Size label: S, M, 32, 7, 18", 12 mm ...
   stock     Int    @default(0)
 
   product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)

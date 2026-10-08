@@ -12,7 +12,11 @@ export default async function StoreLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const categories = (await getCatalogCategories()).map(({ name, slug }) => ({ name, slug }));
+  const categories = (await getCatalogCategories()).map(({ name, slug, children }) => ({
+    name,
+    slug,
+    children: children.map((child) => ({ name: child.name, slug: child.slug })),
+  }));
 
   return (
     <CartProvider>

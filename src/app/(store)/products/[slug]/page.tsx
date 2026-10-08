@@ -7,19 +7,13 @@ import { ProductClient } from "@/components/store/ProductClient";
 import { ProductGallery } from "@/components/store/ProductGallery";
 import { getProductDetail } from "@/lib/dal/catalog";
 import { cldImage } from "@/lib/images";
+import { compareSizes, getTypeConfig, isProductType } from "@/lib/catalog-config";
 
 // Rendered on first visit, then served from cache until the catalog changes.
 export const revalidate = 3600;
 
 export async function generateStaticParams() {
   return [];
-}
-
-const SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL", "FREE"];
-
-function sizeRank(size: string) {
-  const i = SIZE_ORDER.indexOf(size.toUpperCase());
-  return i === -1 ? SIZE_ORDER.length : i;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -45,6 +39,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   const isOnSale = product.originalPrice && product.originalPrice > product.price;
 
+  // What shoppers see under the price depends on the department (fabric for
+  // clothing, dimensions for bags, shape and finish for nail extensions ...).
+  const typeConfig = isProductType(product.category.type) ? getTypeConfig(product.category.type) : null;
+  const attributes = (typeConfig?.fields ?? [])
+    .map((field) => ({ label: field.label, value: product[field.key] }))
+    .filter((a): a is { label: string; value: string } => !!a.value);
+  const department = product.category.parent;
+
   const serializedProduct = {
     id: product.id,
     name: product.name,
@@ -53,12 +55,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     originalPrice: product.originalPrice ?? null,
     images: product.images,
     description: product.description,
-    material: product.material,
+    attributes,
     careInstructions: product.careInstructions,
     hasVariants: product.hasVariants,
+    sizeLabel: typeConfig?.size.label ?? "Size",
     stock: product.stock,
     variants: [...product.variants]
-      .sort((a, b) => sizeRank(a.size) - sizeRank(b.size))
+      .sort((a, b) => compareSizes(a.size, b.size))
       .map((v) => ({ id: v.id, size: v.size, stock: v.stock })),
   };
 
@@ -70,6 +73,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <ChevronRight className="w-3 h-3 mx-3 mt-[1px]" />
         <Link href="/products" className="hover:text-foreground transition-colors">Shop</Link>
         <ChevronRight className="w-3 h-3 mx-3 mt-[1px]" />
+        {department && (
+          <>
+            <Link href={`/categories/${department.slug}`} className="hover:text-foreground transition-colors">{department.name}</Link>
+            <ChevronRight className="w-3 h-3 mx-3 mt-[1px]" />
+          </>
+        )}
         <Link href={`/categories/${product.category.slug}`} className="hover:text-foreground transition-colors">{product.category.name}</Link>
         <ChevronRight className="w-3 h-3 mx-3 mt-[1px]" />
         <span className="text-foreground truncate">{product.name}</span>

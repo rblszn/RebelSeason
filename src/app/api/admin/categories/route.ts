@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { revalidateCatalog } from "@/lib/cache";
 import { getAllCategories } from "@/lib/dal/categories";
+import { categoryInputSchema, resolveCategoryWrite } from "@/lib/admin-categories";
 
 export async function GET() {
   try {
@@ -15,34 +17,22 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { name, slug, description, image } = body;
-
-    if (!name || !slug) {
-      return NextResponse.json(
-        { error: "Name and slug are required" },
-        { status: 400 }
-      );
+    const parsed = categoryInputSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid category data" }, { status: 400 });
     }
 
-    const newCategory = await prisma.category.create({
-      data: {
-        name,
-        slug,
-        description,
-        image,
-      },
-    });
+    const write = await resolveCategoryWrite(parsed.data);
+    if (!write.ok) return NextResponse.json({ error: write.error }, { status: write.status });
+
+    const newCategory = await prisma.category.create({ data: write.data });
 
     revalidateCatalog();
     return NextResponse.json(newCategory, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error creating category:", error);
-    if (error.code === "P2002") {
-      return NextResponse.json(
-        { error: "A category with this slug already exists" },
-        { status: 409 }
-      );
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ error: "A category with this slug already exists" }, { status: 409 });
     }
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

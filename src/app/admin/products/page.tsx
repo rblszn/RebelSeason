@@ -70,7 +70,12 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
                     )}
                   </td>
                   <td className="p-4 font-medium text-gray-800">{product.name}</td>
-                  <td className="p-4 text-gray-600">{product.category.name}</td>
+                  <td className="p-4 text-gray-600">
+                    {product.category.parent ? `${product.category.parent.name} › ${product.category.name}` : product.category.name}
+                    {(product.color || product.shape) && (
+                      <div className="text-xs text-gray-400">{[product.color, product.shape].filter(Boolean).join(" · ")}</div>
+                    )}
+                  </td>
                   <td className="p-4 text-gray-600">
                     ₹{product.price.toLocaleString("en-IN")}
                   </td>

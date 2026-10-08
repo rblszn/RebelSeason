@@ -22,9 +22,10 @@ type SerializedProduct = {
   originalPrice: number | null;
   images: string[];
   description: string | null;
-  material: string | null;
+  attributes: { label: string; value: string }[];
   careInstructions: string | null;
   hasVariants: boolean;
+  sizeLabel: string;
   stock: number;
   variants: SerializedVariant[];
 };
@@ -45,7 +46,7 @@ export function ProductClient({ product }: { product: SerializedProduct }) {
   const addSelectionToCart = (): boolean => {
     if (isSoldOut) return false;
     if (product.hasVariants && !selectedVariant) {
-      alert("Please select a size first.");
+      alert(`Please select a ${product.sizeLabel.toLowerCase()} first.`);
       return false;
     }
     const variant = selectedVariant;
@@ -78,7 +79,7 @@ export function ProductClient({ product }: { product: SerializedProduct }) {
         {product.hasVariants && product.variants && product.variants.length > 0 && (
           <div>
             <div className="flex justify-between items-center mb-3">
-              <span className="text-[11px] font-semibold tracking-[0.1em] uppercase">Size</span>
+              <span className="text-[11px] font-semibold tracking-[0.1em] uppercase">{product.sizeLabel}</span>
 
             </div>
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
@@ -140,10 +141,15 @@ export function ProductClient({ product }: { product: SerializedProduct }) {
         <p>
           {product.description || `The ${product.name} is a versatile essential for your modern wardrobe. Designed with a relaxed fit and premium materials to ensure comfort without compromising on style. The clean lines and subtle details make it perfect for any occasion.`}
         </p>
-        {product.material && (
-          <p>
-            <strong>Material:</strong> {product.material}
-          </p>
+        {product.attributes.length > 0 && (
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2">
+            {product.attributes.map((attribute) => (
+              <div key={attribute.label} className="contents">
+                <dt className="font-medium text-foreground">{attribute.label}</dt>
+                <dd>{attribute.value}</dd>
+              </div>
+            ))}
+          </dl>
         )}
         {product.careInstructions && (
           <p>

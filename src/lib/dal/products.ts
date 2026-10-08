@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 
 export const productInclude = {
-  category: true,
+  category: { include: { parent: { select: { id: true, name: true, slug: true } } } },
   variants: true,
 } satisfies Prisma.ProductInclude;
 
@@ -31,7 +31,7 @@ export async function getAllProducts(
 
   return prisma.product.findMany({
     where: {
-      ...(categorySlug ? { category: { slug: categorySlug } } : {}),
+      ...(categorySlug ? { category: { OR: [{ slug: categorySlug }, { parent: { slug: categorySlug } }] } } : {}),
       ...(isFeatured !== undefined ? { isFeatured } : {}),
       ...(isNew !== undefined ? { isNew } : {}),
       ...(isBestSeller !== undefined ? { isBestSeller } : {}),
@@ -53,7 +53,7 @@ export async function getProductsCount(
 
   return prisma.product.count({
     where: {
-      ...(categorySlug ? { category: { slug: categorySlug } } : {}),
+      ...(categorySlug ? { category: { OR: [{ slug: categorySlug }, { parent: { slug: categorySlug } }] } } : {}),
       ...(isFeatured !== undefined ? { isFeatured } : {}),
       ...(isNew !== undefined ? { isNew } : {}),
       ...(isBestSeller !== undefined ? { isBestSeller } : {}),

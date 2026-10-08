@@ -40,6 +40,22 @@ function parseSizesAndStock(sizesStr) {
   }).filter(s => s.size && !isNaN(s.stock));
 }
 
+// Keep in step with src/lib/catalog-config.ts: what each department requires.
+const REQUIRED_ATTRIBUTES = {
+  CLOTHING: ['color', 'material'],
+  BAGS: ['color', 'material', 'dimensions'],
+  JEWELLERY: ['color', 'material'],
+  NAIL_EXTENSIONS: ['shape', 'finish'],
+};
+const SIZE_MODE = { CLOTHING: 'required', BAGS: 'none', JEWELLERY: 'optional', NAIL_EXTENSIONS: 'required' };
+
+// "rose  gold" -> "Rose Gold", so filters on the storefront group values together.
+function normalizeAttribute(value) {
+  const cleaned = (value || '').replace(/s+/g, ' ').trim();
+  if (!cleaned) return null;
+  return cleaned.replace(/(^|[s/(-])([a-z])/g, (_m, sep, ch) => sep + ch.toUpperCase());
+}
+
 function slugify(text) {
   return text.toString().toLowerCase()
     .replace(/\s+/g, '-')
@@ -63,6 +79,28 @@ async function processProduct(row) {
       console.error(`  -> Category not found for slug: ${categorySlug}. Skipping.`);
       return;
     }
+    if ((await prisma.category.count({ where: { parentId: category.id } })) > 0) {
+      console.error(`  -> "${categorySlug}" is a department. Use one of its categories (e.g. tops, handbags). Skipping.`);
+      return;
+    }
+
+    // Department-specific details
+    const attributes = {
+      color: normalizeAttribute(row['Color']),
+      material: normalizeAttribute(row['Material']),
+      shape: normalizeAttribute(row['Shape']),
+      finish: normalizeAttribute(row['Finish']),
+      dimensions: (row['Dimensions'] || '').replace(/s+/g, ' ').trim() || null,
+    };
+    const required = REQUIRED_ATTRIBUTES[category.type] || [];
+    const missing = required.filter((key) => !attributes[key]);
+    if (missing.length > 0) {
+      console.error(`  -> Missing ${missing.join(', ')} (required for ${category.type}). Skipping.`);
+      return;
+    }
+    for (const key of Object.keys(attributes)) {
+      if (!required.includes(key)) attributes[key] = null;
+    }
 
     // Upload images
     const imageFilenames = row['Image Filenames']?.split(',').map(f => f.trim()).filter(Boolean) || [];
@@ -80,8 +118,15 @@ async function processProduct(row) {
     }
 
     // Parse Variants and Stock
-    const variantsData = parseSizesAndStock(row['Sizes and Stock']);
-    const totalStock = variantsData.reduce((sum, v) => sum + v.stock, 0);
+    const sizeMode = SIZE_MODE[category.type] || 'optional';
+    const variantsData = sizeMode === 'none' ? [] : parseSizesAndStock(row['Sizes and Stock']);
+    if (sizeMode === 'required' && variantsData.length === 0) {
+      console.error(`  -> "Sizes and Stock" is required for ${category.type} (e.g. "S:10, M:20"). Skipping.`);
+      return;
+    }
+    const totalStock = variantsData.length > 0
+      ? variantsData.reduce((sum, v) => sum + v.stock, 0)
+      : parseInt(row['Stock'], 10) || 0;
 
     // Calculate Discount
     const price = parseInt(row['Price'], 10) || 0;
@@ -103,6 +148,7 @@ async function processProduct(row) {
         originalPrice: originalPrice,
         discount: discount > 0 ? discount : null,
         description: row.Description,
+        ...attributes,
         images: imageUrls,
         stock: totalStock,
         hasVariants: variantsData.length > 0,

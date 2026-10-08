@@ -19,11 +19,11 @@ export function ShopByCategory({ categories }: ShopByCategoryProps) {
             Shop by Category
           </h2>
           <p className="mt-4 text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto">
-            Explore our thoughtfully curated collections designed for the modern wardrobe.
+            Clothing, bags, jewellery and nail extensions, curated for the modern wardrobe.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           {categories.map((category) => (
             <Link 
               key={category.id} 
@@ -33,7 +33,7 @@ export function ShopByCategory({ categories }: ShopByCategoryProps) {
               {category.image && (
                 <div 
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-105"
-                  style={{ backgroundImage: `url('${cldImage(category.image, 400)}')` }}
+                  style={{ backgroundImage: `url('${cldImage(category.image, 800)}')` }}
                 />
               )}
               <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-500" />

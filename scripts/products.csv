@@ -1,5 +1,7 @@
-Name,Description,Category Slug,MRP,Price,Sizes and Stock,Image Filenames
-Red Velvet Dress,"A beautiful, elegant red velvet dress perfect for evening parties.",dresses,1999,1499,"S:10, M:20, L:15, XL:5","red-dress-1.jpg, red-dress-2.png"
-Blue Denim Jacket,"Classic oversized blue denim jacket.",jackets,2999,2499,"M:10, L:10","denim-front.jpg"
-Black Graphic Tee,"100% cotton casual tee.",tshirts,999,599,"S:5, M:5, L:5","tee-black.jpg"
-Free Size Poncho,"Comfortable wool poncho.",winterwear,1499,1299,"Free Size:30","poncho.jpg, poncho-side.jpg"
+Name,Description,Category Slug,MRP,Price,Color,Material,Shape,Finish,Dimensions,Sizes and Stock,Stock,Image Filenames
+Red Velvet Dress,"A beautiful, elegant red velvet dress perfect for evening parties.",dresses,1999,1499,Red,Velvet,,,,"S:10, M:20, L:15, XL:5",,"red-dress-1.jpg, red-dress-2.png"
+High Rise Mom Jeans,Relaxed high rise jeans.,bottoms-jeans,2999,2499,Blue,Denim,,,,"28:5, 30:10, 32:10",,jeans-front.jpg
+Tan Leather Tote,Roomy everyday tote.,totes,3999,3499,Tan,Vegan Leather,,,30 x 12 x 25 cm,,25,tote-1.jpg
+Pearl Drop Earrings,Lightweight pearl drops.,earrings,799,599,Gold,Brass,,,,,40,earrings-1.jpg
+Adjustable Stone Ring,Adjustable ring with a stone.,rings,699,499,Silver,Sterling Silver,,,,"6:5, 7:5, 8:5",,ring-1.jpg
+Glossy Almond Press-on Set,24 piece press-on set.,press-on-sets,999,799,,,Almond,Glossy,,"XS:10, S:10, M:10, L:10",,nails-1.jpg

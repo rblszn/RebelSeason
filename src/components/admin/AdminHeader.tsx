@@ -24,7 +24,7 @@ export function AdminHeader({
         method: "POST",
       });
       // Force reload to clear client router cache and redirect to login
-      window.location.href = "/login";
+      window.location.href = "/admin/login";
     } catch (error) {
       console.error("Logout failed:", error);
       setIsLoggingOut(false);

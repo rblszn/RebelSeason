@@ -1,5 +1,14 @@
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import {
+  isProductType,
+  normalizeAttribute,
+  unusedAttributeKeys,
+  validateProductAttributes,
+} from "@/lib/catalog-config";
+
+const attribute = z.string().max(120).nullish();
 
 export const productInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -20,22 +29,60 @@ export const productInputSchema = z.object({
   isFeatured: z.boolean().optional(),
   hasVariants: z.boolean().default(false),
   stock: z.number().int().min(0).default(0),
-  material: z.string().max(500).nullish(),
+  material: attribute,
+  color: attribute,
+  shape: attribute,
+  finish: attribute,
+  dimensions: attribute,
   careInstructions: z.string().max(1000).nullish(),
   features: z.array(z.string().max(200)).max(50).optional(),
   variants: z
     .array(z.object({ size: z.string().trim().min(1).max(20), stock: z.number().int().min(0) }))
-    .max(20)
+    .max(40)
     .default([]),
 });
 
 export type ProductInput = z.infer<typeof productInputSchema>;
 
-export function productData(input: ProductInput) {
+export type CategoryCheck = { ok: true; type: string } | { ok: false; error: string };
+
+/**
+ * Checks the product against the department of its category: the category must
+ * be one products can sit in, and the product must provide that department's
+ * attributes (size, colour, fabric ...).
+ */
+export async function checkProductCategory(input: ProductInput): Promise<CategoryCheck> {
+  const category = await prisma.category.findUnique({
+    where: { id: input.categoryId },
+    select: { type: true, _count: { select: { children: true } } },
+  });
+  if (!category || !isProductType(category.type)) return { ok: false, error: "Selected category does not exist" };
+  if (category._count.children > 0) {
+    return { ok: false, error: "Pick a specific category (for example Tops or Dresses), not the whole department" };
+  }
+  const problem = validateProductAttributes(category.type, input);
+  return problem ? { ok: false, error: problem } : { ok: true, type: category.type };
+}
+
+/** The prisma data for a product row, with attributes cleaned and the stock total derived from sizes. */
+export function productData(input: ProductInput, type: string) {
   const { variants, originalPrice, ...rest } = input;
-  void variants;
+  const attributes = {
+    material: normalizeAttribute(input.material),
+    color: normalizeAttribute(input.color),
+    shape: normalizeAttribute(input.shape),
+    finish: normalizeAttribute(input.finish),
+    dimensions: input.dimensions?.replace(/\s+/g, " ").trim() || null,
+  };
+  // Attributes that do not belong to this department are dropped, so changing a
+  // product's category never leaves stale values behind.
+  if (isProductType(type)) {
+    for (const key of unusedAttributeKeys(type)) attributes[key] = null;
+  }
   return {
     ...rest,
+    ...attributes,
+    stock: input.hasVariants ? variants.reduce((sum, v) => sum + v.stock, 0) : input.stock,
     originalPrice: originalPrice || null,
     discount:
       originalPrice && originalPrice > input.price
@@ -87,4 +134,3 @@ export function prismaErrorResponse(error: unknown): { status: number; error: st
   }
   return null;
 }
-

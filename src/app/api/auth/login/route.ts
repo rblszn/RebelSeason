@@ -30,11 +30,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email, password, portal, isAdmin } = body as {
+    const { email, password, portal } = body as {
       email?: string;
       password?: string;
       portal?: string;
-      isAdmin?: boolean;
     };
 
     if (!email || !password || typeof email !== "string" || typeof password !== "string") {
@@ -65,26 +64,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // Strict role separation:
-    if (isAdmin === true || portal === "admin") {
+    // Strict role separation: the admin portal only accepts admin accounts and
+    // the website only accepts customers. The website answers exactly as it does
+    // for a wrong password, so it does not reveal that an admin account exists.
+    if (portal === "admin") {
       if (user.role !== "ADMIN") {
         return NextResponse.json(
           { error: "Access denied. Admin credentials required." },
           { status: 403 }
         );
       }
-    }
-
-    if (isAdmin === false || portal === "store" || portal === "customer") {
-      if (user.role === "ADMIN") {
-        return NextResponse.json(
-          {
-            error:
-              "Admin credentials cannot be used for customer login. Please use the admin portal.",
-          },
-          { status: 403 }
-        );
-      }
+    } else if (user.role !== "CUSTOMER") {
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 }
+      );
     }
 
     // Role-based session management with dual cookies
@@ -144,20 +138,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    const adminSession = await getAdminSession();
-    if (adminSession.isLoggedIn && adminSession.role === "ADMIN") {
-      return NextResponse.json({
-        isLoggedIn: true,
-        role: "ADMIN",
-        user: {
-          id: adminSession.userId,
-          email: adminSession.email,
-          name: adminSession.name,
-          role: adminSession.role,
-        },
-      });
-    }
-
+    // Customer sessions only; the admin session is never exposed to the website.
     const customerSession = await getCustomerSession();
     if (customerSession.isLoggedIn) {
       return NextResponse.json({

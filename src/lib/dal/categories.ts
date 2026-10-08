@@ -5,8 +5,10 @@ export const categoryInclude = {
   _count: {
     select: {
       products: true,
+      children: true,
     },
   },
+  parent: { select: { id: true, name: true, slug: true } },
 } satisfies Prisma.CategoryInclude;
 
 export type CategoryWithRelations = Prisma.CategoryGetPayload<{
@@ -14,12 +16,13 @@ export type CategoryWithRelations = Prisma.CategoryGetPayload<{
 }>;
 
 /**
- * Fetch all categories ordered alphabetically by name.
+ * Fetch every category (departments and the categories under them), departments
+ * first in their display order. Callers group them by `parentId`.
  */
 export async function getAllCategories(): Promise<CategoryWithRelations[]> {
   return prisma.category.findMany({
     include: categoryInclude,
-    orderBy: { name: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
 }
 

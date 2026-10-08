@@ -1,4 +1,4 @@
-﻿import { PrismaClient, Role } from "@prisma/client";
+﻿import { PrismaClient, ProductType, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -75,79 +75,91 @@ async function main() {
     },
   });
 
-  // ─── Create Categories ───
-  const categories = await Promise.all([
-    prisma.category.create({ data: { name: "Dresses", slug: "dresses", description: "Elegant dresses for every occasion", image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?auto=format&fit=crop&q=80&w=800" } }),
-    prisma.category.create({ data: { name: "Co-ords", slug: "co-ords", description: "Matching sets that make styling effortless", image: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&q=80&w=800" } }),
-    prisma.category.create({ data: { name: "Bottoms", slug: "bottoms", description: "Skirts, trousers, and more", image: "https://images.unsplash.com/photo-1584273143981-41c073dfe8f8?auto=format&fit=crop&q=80&w=800" } }),
-    prisma.category.create({ data: { name: "Bags", slug: "bags", description: "Stylish bags for every outfit", image: "https://images.unsplash.com/photo-1584916201218-f4242ceb4809?auto=format&fit=crop&q=80&w=800" } }),
-    prisma.category.create({ data: { name: "Jeans", slug: "jeans", description: "Premium denim collection", image: "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&q=80&w=800" } }),
-    prisma.category.create({ data: { name: "Winterwear", slug: "winterwear", description: "Stay warm in style", image: "https://images.unsplash.com/photo-1539008835657-9e8e9680c956?auto=format&fit=crop&q=80&w=800" } }),
-  ]);
-  console.log("Created 6 categories");
-
-  const [dresses, coords, bottoms, bags, jeans, winterwear] = categories;
-
-  // ─── Create Products ───
-  const productData = [
-    { name: "Floral Maxi Dress", slug: "floral-maxi-dress", categoryId: dresses.id, price: 4999, originalPrice: 5999, discount: 17, images: ["https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&q=80&w=800"], isNew: true, isFeatured: true, hasVariants: true, description: "A beautiful floral maxi dress perfect for summer occasions.", shortDescription: "Floral print maxi dress", material: "100% Cotton" },
-    { name: "Evening Silk Gown", slug: "evening-silk-gown", categoryId: dresses.id, price: 7499, originalPrice: 8999, discount: 17, images: ["https://images.unsplash.com/photo-1566160980074-ce96bd9584c6?auto=format&fit=crop&q=80&w=800"], isNew: false, isBestSeller: true, hasVariants: true, description: "Luxurious silk gown for special evenings.", shortDescription: "Silk evening gown", material: "Pure Silk" },
-    { name: "Ribbed Co-ord Set", slug: "ribbed-co-ord-set", categoryId: coords.id, price: 2499, images: ["https://images.unsplash.com/photo-1550639525-c97d455acf70?auto=format&fit=crop&q=80&w=800"], isNew: true, hasVariants: true, description: "Comfortable ribbed co-ord set for casual outings.", shortDescription: "Ribbed matching set", material: "Ribbed Cotton Blend" },
-    { name: "Printed Co-ord Set", slug: "printed-co-ord-set", categoryId: coords.id, price: 2999, images: ["https://images.unsplash.com/photo-1596783049098-b80c5417b1bf?auto=format&fit=crop&q=80&w=800"], isNew: false, isFeatured: true, hasVariants: true, description: "Trendy printed co-ord set.", shortDescription: "Printed matching set", material: "Polyester Blend" },
-    { name: "Satin Slip Skirt", slug: "satin-slip-skirt", categoryId: bottoms.id, price: 1999, originalPrice: 2499, discount: 20, images: ["https://images.unsplash.com/photo-1583391733958-d2597285ea93?auto=format&fit=crop&q=80&w=800"], isNew: false, hasVariants: true, description: "Elegant satin slip skirt.", shortDescription: "Satin skirt", material: "Satin" },
-    { name: "Wide Leg Trousers", slug: "wide-leg-trousers", categoryId: bottoms.id, price: 3299, images: ["https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=800"], isNew: true, isBestSeller: true, hasVariants: true, description: "Tailored wide leg trousers for a sophisticated look.", shortDescription: "Wide leg trousers", material: "Linen Blend" },
-    { name: "Leather Tote Bag", slug: "leather-tote-bag", categoryId: bags.id, price: 3999, images: ["https://images.unsplash.com/photo-1584916201218-f4242ceb4809?auto=format&fit=crop&q=80&w=800"], isNew: true, hasVariants: false, stock: 25, description: "Premium leather tote bag.", shortDescription: "Leather tote", material: "Genuine Leather" },
-    { name: "Canvas Crossbody Bag", slug: "canvas-crossbody-bag", categoryId: bags.id, price: 1499, images: ["https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&q=80&w=800"], isNew: false, isFeatured: true, hasVariants: false, stock: 40, description: "Casual canvas crossbody bag.", shortDescription: "Canvas crossbody", material: "Canvas" },
-    { name: "High Rise Skinny Jeans", slug: "high-rise-skinny-jeans", categoryId: jeans.id, price: 2799, images: ["https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&q=80&w=800"], isNew: false, isBestSeller: true, hasVariants: true, description: "Classic high rise skinny jeans.", shortDescription: "Skinny jeans", material: "Denim (98% Cotton, 2% Elastane)" },
-    { name: "Relaxed Fit Mom Jeans", slug: "relaxed-fit-mom-jeans", categoryId: jeans.id, price: 2499, images: ["https://images.unsplash.com/photo-1604176354204-9268737828e4?auto=format&fit=crop&q=80&w=800"], isNew: true, hasVariants: true, description: "Comfortable relaxed fit mom jeans.", shortDescription: "Mom jeans", material: "100% Denim Cotton" },
-    { name: "Chunky Knit Cardigan", slug: "chunky-knit-cardigan", categoryId: winterwear.id, price: 3499, images: ["https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&q=80&w=800"], isNew: false, isFeatured: true, hasVariants: true, description: "Cozy chunky knit cardigan.", shortDescription: "Knit cardigan", material: "Acrylic Wool Blend" },
-    { name: "Cropped Puffer Jacket", slug: "cropped-puffer-jacket", categoryId: winterwear.id, price: 4999, originalPrice: 5999, discount: 17, images: ["https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&q=80&w=800"], isNew: true, isBestSeller: true, hasVariants: true, description: "Trendy cropped puffer jacket.", shortDescription: "Puffer jacket", material: "Nylon with Polyester Fill" },
+  // ─── Create Departments & Categories ───
+  const departmentDefs = [
+    { name: "Clothing", slug: "clothing", type: ProductType.CLOTHING, description: "Tops, bottoms, dresses, co-ord sets, bikinis and winterwear", image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?auto=format&fit=crop&q=80&w=800",
+      children: [["Tops", "tops"], ["Bottoms & Jeans", "bottoms-jeans"], ["Dresses", "dresses"], ["Co-ord Sets", "co-ord-sets"], ["Bikinis", "bikinis"], ["Winterwear", "winterwear"]] },
+    { name: "Bags", slug: "bags", type: ProductType.BAGS, description: "Handbags, totes, crossbody bags, backpacks and wallets", image: "https://images.unsplash.com/photo-1584916201218-f4242ceb4809?auto=format&fit=crop&q=80&w=800",
+      children: [["Handbags", "handbags"], ["Totes", "totes"], ["Crossbody", "crossbody"], ["Backpacks", "backpacks"], ["Wallets", "wallets"]] },
+    { name: "Jewellery", slug: "jewellery", type: ProductType.JEWELLERY, description: "Necklaces, earrings, rings and bracelets & bangles", image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&q=80&w=800",
+      children: [["Necklaces", "necklaces"], ["Earrings", "earrings"], ["Rings", "rings"], ["Bracelets & Bangles", "bracelets-bangles"]] },
+    { name: "Nail Extensions", slug: "nail-extensions", type: ProductType.NAIL_EXTENSIONS, description: "Press-on sets and custom kits", image: "https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&q=80&w=800",
+      children: [["Press-on Sets", "press-on-sets"], ["Custom Kits", "custom-kits"]] },
   ];
 
-  const sizes = ["S", "M", "L", "XL", "XXL"];
+  const categoryBySlug: Record<string, { id: string }> = {};
+  for (const [i, dept] of departmentDefs.entries()) {
+    const department = await prisma.category.create({
+      data: { name: dept.name, slug: dept.slug, type: dept.type, description: dept.description, image: dept.image, sortOrder: (i + 1) * 10 },
+    });
+    categoryBySlug[dept.slug] = department;
+    for (const [j, [name, slug]] of dept.children.entries()) {
+      categoryBySlug[slug] = await prisma.category.create({
+        data: { name, slug, type: dept.type, parentId: department.id, sortOrder: (j + 1) * 10 },
+      });
+    }
+  }
+  console.log("Created 4 departments with their categories");
+
+  // ─── Create Products ───
+  const LETTERS = ["S", "M", "L", "XL", "XXL"];
+  const img = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&q=80&w=800`;
+  type SeedProduct = {
+    name: string; slug: string; category: string; price: number; originalPrice?: number; image: string; description: string;
+    color?: string; material?: string; shape?: string; finish?: string; dimensions?: string;
+    sizes?: string[]; stock?: number; isNew?: boolean; isBestSeller?: boolean; isFeatured?: boolean;
+  };
+  const productData: SeedProduct[] = [
+    { name: "Floral Maxi Dress", slug: "floral-maxi-dress", category: "dresses", price: 4999, originalPrice: 5999, image: img("photo-1572804013309-59a88b7e92f1"), description: "A beautiful floral maxi dress perfect for summer occasions.", color: "Pink", material: "Cotton", sizes: LETTERS, isNew: true, isFeatured: true },
+    { name: "Evening Silk Gown", slug: "evening-silk-gown", category: "dresses", price: 7499, originalPrice: 8999, image: img("photo-1566160980074-ce96bd9584c6"), description: "Luxurious silk gown for special evenings.", color: "Black", material: "Silk", sizes: LETTERS, isBestSeller: true },
+    { name: "Ribbed Co-ord Set", slug: "ribbed-co-ord-set", category: "co-ord-sets", price: 2499, image: img("photo-1550639525-c97d455acf70"), description: "Comfortable ribbed co-ord set for casual outings.", color: "Beige", material: "Knit", sizes: LETTERS, isNew: true },
+    { name: "Printed Co-ord Set", slug: "printed-co-ord-set", category: "co-ord-sets", price: 2999, image: img("photo-1596783049098-b80c5417b1bf"), description: "Trendy printed co-ord set.", color: "Multi", material: "Polyester", sizes: LETTERS, isFeatured: true },
+    { name: "Satin Slip Skirt", slug: "satin-slip-skirt", category: "bottoms-jeans", price: 1999, originalPrice: 2499, image: img("photo-1583391733958-d2597285ea93"), description: "Elegant satin slip skirt.", color: "Olive", material: "Satin", sizes: LETTERS },
+    { name: "High Rise Skinny Jeans", slug: "high-rise-skinny-jeans", category: "bottoms-jeans", price: 2799, image: img("photo-1541099649105-f69ad21f3246"), description: "Classic high rise skinny jeans.", color: "Blue", material: "Denim", sizes: ["28", "30", "32", "34"], isBestSeller: true },
+    { name: "Relaxed Fit Mom Jeans", slug: "relaxed-fit-mom-jeans", category: "bottoms-jeans", price: 2499, image: img("photo-1604176354204-9268737828e4"), description: "Comfortable relaxed fit mom jeans.", color: "Black", material: "Denim", sizes: ["28", "30", "32", "34"], isNew: true },
+    { name: "Linen Button-Down Top", slug: "linen-button-down-top", category: "tops", price: 1799, image: img("photo-1598554747436-c9293d6a588f"), description: "Breezy linen top for warm days.", color: "White", material: "Linen", sizes: LETTERS, isNew: true },
+    { name: "Chunky Knit Cardigan", slug: "chunky-knit-cardigan", category: "winterwear", price: 3499, image: img("photo-1620799140408-edc6dcb6d633"), description: "Cozy chunky knit cardigan.", color: "Cream", material: "Wool", sizes: LETTERS, isFeatured: true },
+    { name: "Cropped Puffer Jacket", slug: "cropped-puffer-jacket", category: "winterwear", price: 4999, originalPrice: 5999, image: img("photo-1544441893-675973e31985"), description: "Trendy cropped puffer jacket.", color: "Black", material: "Nylon", sizes: LETTERS, isNew: true, isBestSeller: true },
+    { name: "Leather Tote Bag", slug: "leather-tote-bag", category: "totes", price: 3999, image: img("photo-1584916201218-f4242ceb4809"), description: "Premium tote bag with room for a laptop.", color: "Tan", material: "Leather", dimensions: "38 x 14 x 30 cm", stock: 25, isNew: true },
+    { name: "Canvas Crossbody Bag", slug: "canvas-crossbody-bag", category: "crossbody", price: 1499, image: img("photo-1548036328-c9fa89d128fa"), description: "Casual canvas crossbody bag.", color: "Olive", material: "Canvas", dimensions: "24 x 8 x 18 cm", stock: 40, isFeatured: true },
+    { name: "Pearl Drop Earrings", slug: "pearl-drop-earrings", category: "earrings", price: 599, originalPrice: 799, image: img("photo-1535632066927-ab7c9ab60908"), description: "Lightweight pearl drop earrings.", color: "Gold", material: "Brass", stock: 60, isNew: true, isBestSeller: true },
+    { name: "Layered Chain Necklace", slug: "layered-chain-necklace", category: "necklaces", price: 899, image: img("photo-1599643478518-a784e5dc4c8f"), description: "Delicate layered chain necklace.", color: "Silver", material: "Stainless Steel", sizes: ['16"', '18"', '20"'], isFeatured: true },
+    { name: "Stackable Stone Ring", slug: "stackable-stone-ring", category: "rings", price: 499, image: img("photo-1605100804763-247f67b3557e"), description: "Stackable ring with a small stone.", color: "Rose Gold", material: "Brass", sizes: ["6", "7", "8", "9"] },
+    { name: "Glossy Almond Press-on Set", slug: "glossy-almond-press-on-set", category: "press-on-sets", price: 799, image: img("photo-1604654894610-df63bc536371"), description: "24 piece press-on set with glue and prep kit.", shape: "Almond", finish: "Glossy", sizes: ["XS", "S", "M", "L"], isNew: true, isBestSeller: true },
+    { name: "Matte Coffin Press-on Set", slug: "matte-coffin-press-on-set", category: "press-on-sets", price: 849, image: img("photo-1519014816548-bf5fe059798b"), description: "Matte nude coffin set.", shape: "Coffin", finish: "Matte", sizes: ["XS", "S", "M", "L"] },
+  ];
+
   const createdProducts = [];
 
   for (const pData of productData) {
+    const sizes = pData.sizes ?? [];
+    const variantStocks = sizes.map((_, i) => [10, 15, 20, 12, 8][i % 5]);
     const product = await prisma.product.create({
       data: {
         name: pData.name,
         slug: pData.slug,
-        categoryId: pData.categoryId,
+        categoryId: categoryBySlug[pData.category].id,
         price: pData.price,
         originalPrice: pData.originalPrice || null,
-        discount: pData.discount || null,
-        images: pData.images,
+        discount: pData.originalPrice ? Math.round(((pData.originalPrice - pData.price) / pData.originalPrice) * 100) : null,
+        images: [pData.image],
         isNew: pData.isNew || false,
         isBestSeller: pData.isBestSeller || false,
         isFeatured: pData.isFeatured || false,
-        hasVariants: pData.hasVariants,
-        stock: pData.stock || 0,
-        description: pData.description || null,
-        shortDescription: pData.shortDescription || null,
+        hasVariants: sizes.length > 0,
+        stock: sizes.length > 0 ? variantStocks.reduce((a, b) => a + b, 0) : pData.stock || 0,
+        description: pData.description,
+        color: pData.color || null,
         material: pData.material || null,
+        shape: pData.shape || null,
+        finish: pData.finish || null,
+        dimensions: pData.dimensions || null,
+        variants: { create: sizes.map((size, i) => ({ size, stock: variantStocks[i] })) },
       },
     });
-
-    if (pData.hasVariants) {
-      const variantStocks = [10, 15, 20, 12, 8];
-      for (let i = 0; i < sizes.length; i++) {
-        await prisma.productVariant.create({
-          data: {
-            productId: product.id,
-            size: sizes[i],
-            stock: variantStocks[i],
-          },
-        });
-      }
-      await prisma.product.update({
-        where: { id: product.id },
-        data: { stock: variantStocks.reduce((a, b) => a + b, 0) },
-      });
-    }
-
     createdProducts.push(product);
   }
-  console.log(`Created ${createdProducts.length} products with variants`);
+  console.log(`Created ${createdProducts.length} products across the four departments`);
 
   // ─── Create Sample Orders ───
   const order1 = await prisma.order.create({
@@ -251,7 +263,7 @@ async function main() {
       customerPhone: customer1.phone,
       shippingAddress: { name: "Priya Sharma", street: "42 MG Road, Sector 17", city: "Gurgaon", state: "Haryana", pincode: "122001" },
       items: {
-        create: { productId: createdProducts[6].id, name: createdProducts[6].name, quantity: 1, price: 3999, image: createdProducts[6].images[0] },
+        create: { productId: createdProducts[10].id, name: createdProducts[10].name, quantity: 1, price: 3999, image: createdProducts[10].images[0] },
       },
       payment: {
         create: { amount: 3999, method: "ONLINE", status: "CAPTURED", capturedAt: new Date() },
@@ -270,7 +282,7 @@ async function main() {
       customerEmail: customer2.email,
       shippingAddress: { name: "Ananya Gupta", street: "15 Park Street", city: "Mumbai", state: "Maharashtra", pincode: "400001" },
       items: {
-        create: { productId: createdProducts[8].id, name: createdProducts[8].name, quantity: 1, price: 2799, image: createdProducts[8].images[0], variantName: "XL" },
+        create: { productId: createdProducts[5].id, name: createdProducts[5].name, quantity: 1, price: 2799, image: createdProducts[5].images[0], variantName: "30" },
       },
       payment: {
         create: { amount: 2799, method: "COD", status: "UNPAID" },
@@ -284,7 +296,7 @@ async function main() {
     data: [
       { userId: customer1.id, productId: createdProducts[0].id, rating: 5, title: "Absolutely stunning!", comment: "The fabric is so soft and the fit is perfect. I got so many compliments!" },
       { userId: customer2.id, productId: createdProducts[1].id, rating: 4, title: "Beautiful gown", comment: "Really elegant. Just needed minor alterations but overall great quality." },
-      { userId: customer3.id, productId: createdProducts[8].id, rating: 5, title: "Perfect fit!", comment: "These jeans fit like a dream. Will definitely order more." },
+      { userId: customer3.id, productId: createdProducts[5].id, rating: 5, title: "Perfect fit!", comment: "These jeans fit like a dream. Will definitely order more." },
     ],
   });
   console.log("Created 3 sample reviews");

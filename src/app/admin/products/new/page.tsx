@@ -13,7 +13,7 @@ export default async function NewProductPage() {
         <p className="text-gray-500 mt-1">Create a new product in your store.</p>
       </div>
 
-      <ProductForm categories={categories.map(c => ({ id: c.id, name: c.name }))} />
+      <ProductForm categories={categories.map(({ id, name, slug, type, parentId }) => ({ id, name, slug, type, parentId }))} />
     </div>
   );
 }

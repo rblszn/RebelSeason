@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getProductById } from "@/lib/dal/products";
 import { revalidateCatalog } from "@/lib/cache";
-import { productData, productInputSchema, prismaErrorResponse, syncVariants } from "@/lib/admin-products";
+import { checkProductCategory, productData, productInputSchema, prismaErrorResponse, syncVariants } from "@/lib/admin-products";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -27,8 +27,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     const input = parsed.data;
 
+    const check = await checkProductCategory(input);
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
+
     const product = await prisma.$transaction(async (tx) => {
-      await tx.product.update({ where: { id }, data: productData(input) });
+      await tx.product.update({ where: { id }, data: productData(input, check.type) });
       await syncVariants(tx, id, input.hasVariants, input.variants);
       return tx.product.findUnique({ where: { id }, include: { category: true, variants: true } });
     });

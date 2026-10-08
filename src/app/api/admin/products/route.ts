@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAllProducts } from "@/lib/dal/products";
 import { revalidateCatalog } from "@/lib/cache";
-import { productData, productInputSchema, prismaErrorResponse } from "@/lib/admin-products";
+import { checkProductCategory, productData, productInputSchema, prismaErrorResponse } from "@/lib/admin-products";
 
 export async function GET() {
   try {
@@ -22,9 +22,12 @@ export async function POST(req: NextRequest) {
     }
     const input = parsed.data;
 
+    const check = await checkProductCategory(input);
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
+
     const product = await prisma.product.create({
       data: {
-        ...productData(input),
+        ...productData(input, check.type),
         variants: input.hasVariants && input.variants.length > 0 ? { create: input.variants } : undefined,
       },
       include: {

@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 
 export default function AdminLogin() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@rebelseason.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -60,6 +60,7 @@ export default function AdminLogin() {
             <input
               type="email"
               required
+              autoComplete="off"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full p-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black outline-none transition-all"
@@ -73,6 +74,7 @@ export default function AdminLogin() {
             <input
               type="password"
               required
+              autoComplete="off"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full p-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black outline-none transition-all"
