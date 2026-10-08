@@ -2,6 +2,7 @@
 import Link from "next/link";
 import type { ProductCardData } from "@/lib/dal/catalog";
 import { cldImage } from "@/lib/images";
+import { compareSizes } from "@/lib/catalog-config";
 
 interface ProductCardProps {
   product: ProductCardData;
@@ -18,6 +19,12 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   const totalStock = product.hasVariants
     ? product.variants.reduce((sum, v) => sum + (v.stock || 0), 0)
     : product.stock;
+
+  // Clothing cards list the sizes still in stock; other departments show none.
+  const availableSizes =
+    product.category.type === "CLOTHING" && product.hasVariants
+      ? product.variants.filter((v) => v.stock > 0).map((v) => v.size).sort(compareSizes)
+      : [];
 
   return (
     <div className="group flex flex-col w-full">
@@ -88,6 +95,11 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             <span className="text-foreground">₹{product.price.toLocaleString('en-IN')}</span>
           )}
         </div>
+        {availableSizes.length > 0 && (
+          <p className="text-[11px] tracking-wide text-muted-foreground" aria-label={`Available sizes: ${availableSizes.join(", ")}`}>
+            {availableSizes.join("  ·  ")}
+          </p>
+        )}
       </div>
     </div>
   );

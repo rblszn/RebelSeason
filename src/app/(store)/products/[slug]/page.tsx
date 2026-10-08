@@ -8,6 +8,7 @@ import { ProductGallery } from "@/components/store/ProductGallery";
 import { getProductDetail } from "@/lib/dal/catalog";
 import { cldImage } from "@/lib/images";
 import { compareSizes, getTypeConfig, isProductType } from "@/lib/catalog-config";
+import { siteConfig } from "@/lib/site-config";
 
 // Rendered on first visit, then served from cache until the catalog changes.
 export const revalidate = 3600;
@@ -46,6 +47,27 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     .map((field) => ({ label: field.label, value: product[field.key] }))
     .filter((a): a is { label: string; value: string } => !!a.value);
   const department = product.category.parent;
+  const saving = isOnSale ? (product.originalPrice as number) - product.price : 0;
+  const savingPercent = isOnSale ? Math.round((saving / (product.originalPrice as number)) * 100) : 0;
+  const inStock = product.hasVariants ? product.variants.some((v) => v.stock > 0) : product.stock > 0;
+
+  // Lets search engines show price and availability next to the listing.
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description || undefined,
+    image: product.images.map((image) => cldImage(image, 1200)),
+    brand: { "@type": "Brand", name: siteConfig.brandName },
+    color: product.color || undefined,
+    material: product.material || undefined,
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "INR",
+      price: product.price,
+      availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    },
+  };
 
   const serializedProduct = {
     id: product.id,
@@ -67,6 +89,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+      <script
+        type="application/ld+json"
+        // "<" is escaped so product text can never close the script tag.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
+      />
       {/* Breadcrumb */}
       <nav className="flex text-[11px] font-medium tracking-[0.1em] uppercase text-muted-foreground mb-10">
         <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
@@ -95,7 +122,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <div className="flex-1 lg:max-w-md xl:max-w-lg lg:py-10">
           <h1 className="font-heading text-4xl sm:text-5xl font-normal mb-4">{product.name}</h1>
 
-          <div className="flex items-center gap-4 text-xl mb-10">
+          <div className="flex items-center gap-4 text-xl mb-3">
             {isOnSale ? (
               <>
                 <span className="text-muted-foreground line-through text-lg">₹{product.originalPrice?.toLocaleString('en-IN')}</span>
@@ -106,7 +133,21 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             )}
           </div>
 
-          <ProductClient product={serializedProduct} />
+          {isOnSale ? (
+            <p className="mb-10">
+              <span className="inline-block bg-primary px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-primary-foreground">
+                Save ₹{saving.toLocaleString("en-IN")} ({savingPercent}% off)
+              </span>
+            </p>
+          ) : (
+            <div className="mb-7" />
+          )}
+
+          <ProductClient
+            product={serializedProduct}
+            deliveryDays={siteConfig.deliveryDays}
+            freeShippingThreshold={siteConfig.freeShippingThreshold}
+          />
 
         </div>
       </div>

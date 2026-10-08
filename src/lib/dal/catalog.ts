@@ -22,7 +22,8 @@ export const productCardSelect = {
   isNew: true,
   stock: true,
   hasVariants: true,
-  variants: { select: { stock: true } },
+  variants: { select: { size: true, stock: true } },
+  category: { select: { type: true } },
 } satisfies Prisma.ProductSelect;
 
 export type ProductCardData = Prisma.ProductGetPayload<{ select: typeof productCardSelect }>;
