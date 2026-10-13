@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { cldImage } from "@/lib/images";
+import { buildBill } from "@/lib/bill";
 
 type SuccessOrder = {
   id: string;
@@ -17,11 +18,11 @@ type SuccessOrder = {
   shippingAddress: unknown;
   createdAt: string;
   payment: { status: string; razorpayPaymentId: string | null } | null;
-  items: { id: string; name: string; variantName: string | null; quantity: number; price: number; image: string | null }[];
+  items: { id: string; name: string; variantName: string | null; quantity: number; price: number; mrp: number | null; image: string | null }[];
 };
 
 export default function OrderSuccessClient({ order }: { order: SuccessOrder }) {
-  const { subtotal, shipping, discount, couponCode } = order;
+  const bill = buildBill(order);
   const isPaid = order.payment?.status === "CAPTURED";
   const paymentId = order.payment?.razorpayPaymentId || "N/A";
   const router = useRouter();
@@ -122,7 +123,11 @@ export default function OrderSuccessClient({ order }: { order: SuccessOrder }) {
                     <p className="text-sm text-gray-500 mt-1">Qty: {item.quantity}</p>
                   </div>
                   <div className="text-right">
+                    {item.mrp !== null && item.mrp > item.price && (
+                      <p className="text-xs text-gray-400 line-through">₹{(item.mrp * item.quantity).toLocaleString("en-IN")}</p>
+                    )}
                     <p className="text-sm font-medium text-gray-900">₹{(item.price * item.quantity).toLocaleString("en-IN")}</p>
+                    <p className="text-xs text-gray-500">₹{item.price.toLocaleString("en-IN")} each</p>
                   </div>
                 </div>
               ))}
@@ -130,24 +135,39 @@ export default function OrderSuccessClient({ order }: { order: SuccessOrder }) {
 
             {/* Total Breakdown */}
             <div className="space-y-3 mb-10 pb-10 border-b border-gray-100 max-w-sm ml-auto">
+              {bill.saleSavings > 0 && (
+                <>
+                  <div className="flex justify-between text-sm text-gray-500">
+                    <p>Total at MRP</p>
+                    <p className="line-through">₹{bill.mrpTotal.toLocaleString("en-IN")}</p>
+                  </div>
+                  <div className="flex justify-between text-sm text-green-600">
+                    <p>Discount on MRP</p>
+                    <p>-₹{bill.saleSavings.toLocaleString("en-IN")}</p>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between text-sm text-gray-500">
                 <p>Subtotal</p>
-                <p>₹{subtotal.toLocaleString("en-IN")}</p>
+                <p>₹{bill.subtotal.toLocaleString("en-IN")}</p>
               </div>
-              <div className="flex justify-between text-sm text-gray-500">
-                <p>Shipping</p>
-                <p>{shipping > 0 ? `₹${shipping.toLocaleString("en-IN")}` : "Free"}</p>
-              </div>
-              {discount > 0 && (
+              {bill.couponDiscount > 0 && (
                 <div className="flex justify-between text-sm text-green-600">
-                  <p>Discount {couponCode ? `(${couponCode})` : ""}</p>
-                  <p>-₹{discount.toLocaleString("en-IN")}</p>
+                  <p>Coupon discount {bill.couponCode ? `(${bill.couponCode})` : ""}</p>
+                  <p>-₹{bill.couponDiscount.toLocaleString("en-IN")}</p>
                 </div>
               )}
+              <div className="flex justify-between text-sm text-gray-500">
+                <p>Shipping</p>
+                <p>{bill.shipping > 0 ? `₹${bill.shipping.toLocaleString("en-IN")}` : "Free"}</p>
+              </div>
               <div className="flex justify-between text-lg font-bold text-gray-900 pt-3 border-t border-gray-100">
                 <p>Total</p>
                 <p>₹{order.total.toLocaleString("en-IN")}</p>
               </div>
+              {bill.totalSavings > 0 && (
+                <p className="text-right text-xs text-green-600">You saved ₹{bill.totalSavings.toLocaleString("en-IN")} on this order.</p>
+              )}
             </div>
 
             {/* Shipping Address */}
@@ -175,6 +195,16 @@ export default function OrderSuccessClient({ order }: { order: SuccessOrder }) {
               >
                 Continue Shopping
               </Link>
+              {isPaid && (
+                <a
+                  href={`/api/account/orders/${order.id}/invoice?print=1`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex justify-center items-center px-8 py-3 border border-gray-300 shadow-sm text-base font-medium rounded-full text-gray-700 bg-white hover:bg-gray-50 transition-colors w-full sm:w-auto"
+                >
+                  Download Invoice
+                </a>
+              )}
               <Link 
                 href="/account" 
                 className="inline-flex justify-center items-center px-8 py-3 border border-gray-300 shadow-sm text-base font-medium rounded-full text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-colors w-full sm:w-auto"

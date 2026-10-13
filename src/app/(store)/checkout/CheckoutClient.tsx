@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
 import { shippingFor } from "@/lib/pricing";
+import { buildBill } from "@/lib/bill";
 import { cldImage } from "@/lib/images";
 import { siteConfig } from "@/lib/site-config";
 import { Input } from "@/components/ui/input";
@@ -197,6 +198,14 @@ export default function CheckoutClient({ session }: { session: CheckoutSession }
   const discount = appliedCoupon?.discount || 0;
   const shipping = shippingFor(subtotal);
   const total = Math.max(0, subtotal - discount + shipping);
+  const bill = buildBill({
+    items: items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price, mrp: i.originalPrice })),
+    subtotal,
+    discount,
+    shipping,
+    total,
+    couponCode: appliedCoupon?.code,
+  });
 
   const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -502,25 +511,42 @@ export default function CheckoutClient({ session }: { session: CheckoutSession }
                     <p className="font-medium">{item.name}</p>
                     {item.size && <p className="text-muted-foreground text-xs">{item.size}</p>}
                   </div>
-                  <span className="text-sm font-medium">₹{item.price * item.quantity}</span>
+                  <div className="text-right text-sm">
+                    {item.originalPrice && item.originalPrice > item.price && (
+                      <p className="text-xs text-muted-foreground line-through">₹{(item.originalPrice * item.quantity).toLocaleString("en-IN")}</p>
+                    )}
+                    <p className="font-medium">₹{(item.price * item.quantity).toLocaleString("en-IN")}</p>
+                  </div>
                 </div>
               ))}
             </div>
 
             <div className="space-y-3 text-sm mb-6 pb-6 border-b border-border/50">
+              {bill.saleSavings > 0 && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total at MRP</span>
+                    <span className="text-muted-foreground line-through">₹{bill.mrpTotal.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-green-700">
+                    <span>Discount on MRP</span>
+                    <span className="font-medium">-₹{bill.saleSavings.toLocaleString("en-IN")}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
                 <span className="font-medium">₹{subtotal.toLocaleString("en-IN")}</span>
               </div>
               {appliedCoupon && (
                 <div className="flex justify-between text-green-700">
-                  <span>Discount ({appliedCoupon.code})</span>
+                  <span>Coupon discount ({appliedCoupon.code})</span>
                   <span className="font-medium">-₹{discount.toLocaleString("en-IN")}</span>
                 </div>
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shipping</span>
-                <span className="font-medium">{shipping === 0 ? "Free" : `₹${shipping}`}</span>
+                <span className="font-medium">{shipping === 0 ? "Free" : `₹${shipping.toLocaleString("en-IN")}`}</span>
               </div>
             </div>
             
@@ -528,6 +554,9 @@ export default function CheckoutClient({ session }: { session: CheckoutSession }
               <span>Total</span>
               <span>₹{total.toLocaleString("en-IN")}</span>
             </div>
+            {bill.totalSavings > 0 && (
+              <p className="mt-3 text-right text-xs text-green-700">You are saving ₹{bill.totalSavings.toLocaleString("en-IN")} on this order.</p>
+            )}
           </div>
         </div>
         

@@ -85,7 +85,7 @@ export function ProductClient({
       slug: product.slug,
       size: selectedSize || undefined,
       price: product.price,
-      originalPrice: product.originalPrice || undefined,
+      originalPrice: product.originalPrice && product.originalPrice > product.price ? product.originalPrice : undefined,
       image: product.images[0],
       quantity: Math.min(quantity, maxQty)
     });

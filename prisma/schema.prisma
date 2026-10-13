@@ -210,7 +210,8 @@ model OrderItem {
   variantName String?
   name        String
   quantity    Int
-  price       Int
+  price       Int // Unit price charged
+  mrp         Int? // Unit original price (MRP) at the time of purchase; null on older orders
   image       String?
 
   order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)

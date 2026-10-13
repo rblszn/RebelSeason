@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { siteConfig } from '@/lib/site-config';
+import { buildBill, formatINR } from '@/lib/bill';
 
 export const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -91,19 +92,51 @@ export async function sendOrderConfirmationEmail(to: string, order: any): Promis
     ? JSON.parse(order.shippingAddress)
     : order.shippingAddress;
 
-  const itemsHtml = order.items.map((item: any) => {
-    const sizeRow = item.variantName
-      ? '<p style="margin: 4px 0 0; font-size: 13px; color: #666666;">Size: ' + esc(item.variantName) + '</p>'
+  const bill = buildBill(order);
+
+  const itemsHtml = bill.lines.map((line) => {
+    const sizeRow = line.variantName
+      ? '<p style="margin: 4px 0 0; font-size: 13px; color: #666666;">Size: ' + esc(line.variantName) + '</p>'
+      : '';
+    const unitRow = '<p style="margin: 4px 0 0; font-size: 13px; color: #666666;">'
+      + (line.onSale ? '<span style="text-decoration: line-through; color: #999999;">' + formatINR(line.unitMrp) + '</span> ' : '')
+      + formatINR(line.unitPrice) + ' each</p>';
+    const amountMrp = line.onSale
+      ? '<div style="font-size: 12px; font-weight: 400; color: #999999; text-decoration: line-through;">' + formatINR(line.lineMrp) + '</div>'
       : '';
     return '<tr>'
       + '<td style="padding: 12px 0; border-bottom: 1px solid #f0f0f0;">'
-      + '<p style="margin: 0; font-weight: 600; color: #111111;">' + esc(item.name) + '</p>'
+      + '<p style="margin: 0; font-weight: 600; color: #111111;">' + esc(line.name) + '</p>'
       + sizeRow
+      + unitRow
       + '</td>'
-      + '<td align="center" style="padding: 12px 0; border-bottom: 1px solid #f0f0f0; color: #444444;">' + esc(item.quantity) + '</td>'
-      + '<td align="right" style="padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-weight: 500; color: #111111;">\u20B9' + (item.price * item.quantity) + '</td>'
+      + '<td align="center" style="padding: 12px 0; border-bottom: 1px solid #f0f0f0; color: #444444;">' + esc(line.quantity) + '</td>'
+      + '<td align="right" style="padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-weight: 500; color: #111111;">' + amountMrp + formatINR(line.lineTotal) + '</td>'
       + '</tr>';
   }).join('');
+
+  const summaryRow = (label: string, value: string, color = '#666666', valueColor = '#111111') =>
+    '<tr>'
+    + '<td colspan="2" align="right" style="padding: 6px 0; font-size: 14px; color: ' + color + ';">' + label + '</td>'
+    + '<td align="right" style="padding: 6px 0; font-weight: 500; color: ' + valueColor + ';">' + value + '</td>'
+    + '</tr>';
+
+  const summaryHtml = [
+    bill.saleSavings > 0 ? summaryRow('Total at MRP:', '<span style="text-decoration: line-through; color: #999999;">' + formatINR(bill.mrpTotal) + '</span>') : '',
+    bill.saleSavings > 0 ? summaryRow('Discount on MRP:', '-' + formatINR(bill.saleSavings), '#16a34a', '#16a34a') : '',
+    summaryRow('Subtotal:', formatINR(bill.subtotal)),
+    bill.couponDiscount > 0
+      ? summaryRow('Coupon discount' + (bill.couponCode ? ' (' + esc(bill.couponCode) + ')' : '') + ':', '-' + formatINR(bill.couponDiscount), '#16a34a', '#16a34a')
+      : '',
+    summaryRow('Shipping:', bill.shipping === 0 ? 'Free' : formatINR(bill.shipping)),
+    '<tr>'
+      + '<td colspan="2" align="right" style="padding: 12px 0 0; font-size: 16px; font-weight: 700; color: #111111; border-top: 2px solid #111111;">Total:</td>'
+      + '<td align="right" style="padding: 12px 0 0; font-size: 16px; font-weight: 700; color: #111111; border-top: 2px solid #111111;">' + formatINR(bill.total) + '</td>'
+      + '</tr>',
+    bill.totalSavings > 0
+      ? '<tr><td colspan="3" align="right" style="padding: 8px 0 0; font-size: 13px; font-weight: 600; color: #16a34a;">You saved ' + formatINR(bill.totalSavings) + ' on this order.</td></tr>'
+      : '',
+  ].join('');
 
   const paymentRefHtml = order.payment?.razorpayPaymentId
     ? '<p style="margin: 0; font-size: 14px; color: #666666;">Payment Ref: <strong style="color: #111111;">' + esc(order.payment.razorpayPaymentId) + '</strong></p>'
@@ -135,19 +168,8 @@ export async function sendOrderConfirmationEmail(to: string, order: any): Promis
       </thead>
       <tbody>${itemsHtml}</tbody>
       <tfoot>
-        <tr>
-          <td colspan="2" align="right" style="padding: 16px 0 8px; font-size: 14px; color: #666666;">Subtotal:</td>
-          <td align="right" style="padding: 16px 0 8px; font-weight: 500; color: #111111;">\u20B9${order.subtotal}</td>
-        </tr>
-        <tr>
-          <td colspan="2" align="right" style="padding: 8px 0; font-size: 14px; color: #666666;">Shipping:</td>
-          <td align="right" style="padding: 8px 0; font-weight: 500; color: #111111;">${order.shipping === 0 ? 'Free' : '\u20B9' + order.shipping}</td>
-        </tr>
-        ${order.discount > 0 ? '<tr><td colspan="2" align="right" style="padding: 8px 0; font-size: 14px; color: #16a34a;">Discount ' + (order.couponCode ? '(' + esc(order.couponCode) + ')' : '') + ':</td><td align="right" style="padding: 8px 0; font-weight: 500; color: #16a34a;">-₹' + order.discount + '</td></tr>' : ''}
-        <tr>
-          <td colspan="2" align="right" style="padding: 12px 0 0; font-size: 16px; font-weight: 700; color: #111111; border-top: 2px solid #111111;">Total:</td>
-          <td align="right" style="padding: 12px 0 0; font-size: 16px; font-weight: 700; color: #111111; border-top: 2px solid #111111;">\u20B9${order.total}</td>
-        </tr>
+        <tr><td colspan="3" style="padding-top: 10px;"></td></tr>
+        ${summaryHtml}
       </tfoot>
     </table>
 

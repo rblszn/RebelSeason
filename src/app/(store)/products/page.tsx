@@ -1,6 +1,6 @@
 import { CatalogView } from "@/components/store/CatalogView";
 import { getCatalogCategories, getCatalogFacets, getProductPage, parsePage } from "@/lib/dal/catalog";
-import { parseFilters } from "@/lib/catalog-filters";
+import { parseFilters, parseSort } from "@/lib/catalog-filters";
 
 export const metadata = { title: "Shop All" };
 
@@ -12,9 +12,10 @@ export default async function ProductsPage({
   const resolvedParams = await searchParams;
   const page = parsePage(resolvedParams.page);
   const filters = parseFilters(resolvedParams);
+  const sort = parseSort(resolvedParams);
 
   const [{ products, total, totalPages }, facets, departments] = await Promise.all([
-    getProductPage(page, null, filters),
+    getProductPage(page, null, filters, sort),
     getCatalogFacets(null),
     getCatalogCategories(),
   ]);
@@ -32,6 +33,7 @@ export default async function ProductsPage({
       page={page}
       facets={facets}
       filters={filters}
+      sort={sort}
     />
   );
 }

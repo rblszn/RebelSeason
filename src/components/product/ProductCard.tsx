@@ -22,7 +22,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
 
   // Clothing cards list the sizes still in stock; other departments show none.
   const availableSizes =
-    product.category.type === "CLOTHING" && product.hasVariants
+    product.category?.type === "CLOTHING" && product.hasVariants
       ? product.variants.filter((v) => v.stock > 0).map((v) => v.size).sort(compareSizes)
       : [];
 

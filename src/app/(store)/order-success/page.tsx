@@ -49,6 +49,7 @@ export default async function OrderSuccessPage({
       variantName: item.variantName,
       quantity: item.quantity,
       price: item.price,
+      mrp: item.mrp,
       image: item.image,
     })),
   };

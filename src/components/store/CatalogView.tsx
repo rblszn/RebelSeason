@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { ProductCard } from "@/components/product/ProductCard";
 import { Pagination } from "@/components/ui/Pagination";
 import { CatalogFilters } from "@/components/store/CatalogFilters";
 import type { CatalogFacets, ProductCardData } from "@/lib/dal/catalog";
 import type { ProductType } from "@/lib/catalog-config";
-import { activeFilterCount, type CatalogFilters as Filters } from "@/lib/catalog-filters";
+import { SORT_OPTIONS, activeFilterCount, filtersHref, type CatalogFilters as Filters, type SortKey } from "@/lib/catalog-filters";
 
 export type CatalogCrumb = { label: string; href?: string };
 export type CatalogPill = { label: string; href: string; active?: boolean };
@@ -24,6 +24,7 @@ interface CatalogViewProps {
   page: number;
   facets: CatalogFacets;
   filters: Filters;
+  sort: SortKey;
 }
 
 /** Shared layout for the Shop page and department / category pages: heading, category pills, filters, grid. */
@@ -40,6 +41,7 @@ export function CatalogView({
   page,
   facets,
   filters,
+  sort,
 }: CatalogViewProps) {
   const filtered = activeFilterCount(filters) > 0;
 
@@ -83,14 +85,38 @@ export function CatalogView({
         </div>
       )}
 
-      <div className="flex justify-center items-center py-4 border-y border-border mb-10">
+      <div className="flex items-center justify-between gap-4 py-4 border-y border-border mb-10">
         <div className="text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-medium">
           {total} {total === 1 ? "Result" : "Results"}
         </div>
+
+        {total > 1 && (
+          <details className="group relative">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.1em]">
+              <span className="text-muted-foreground font-medium">Sort by:</span>
+              {SORT_OPTIONS.find((o) => o.id === sort)?.label}
+              <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+            </summary>
+            <ul className="absolute right-0 top-full z-20 mt-3 min-w-[210px] border border-border bg-background py-2 shadow-lg">
+              {SORT_OPTIONS.map((option) => (
+                <li key={option.id}>
+                  <Link
+                    href={filtersHref(basePath, filters, option.id)}
+                    scroll={false}
+                    aria-current={option.id === sort ? "true" : undefined}
+                    className={`block px-5 py-2 text-[12px] hover:bg-secondary ${option.id === sort ? "font-semibold" : "text-muted-foreground"}`}
+                  >
+                    {option.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
-        <CatalogFilters basePath={basePath} facets={facets} filters={filters} type={type} />
+        <CatalogFilters basePath={basePath} facets={facets} filters={filters} sort={sort} type={type} />
 
         <div className="flex-1 min-w-0">
           {products.length > 0 ? (

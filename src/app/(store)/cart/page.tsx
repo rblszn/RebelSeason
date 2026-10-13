@@ -6,11 +6,19 @@ import { Minus, Plus, X } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 import { cldImage } from "@/lib/images";
 import { MAX_QTY_PER_LINE } from "@/lib/pricing";
+import { buildBill } from "@/lib/bill";
 
 export default function CartPage() {
   const { items, updateQuantity, removeItem, getTotal } = useCart();
   
   const subtotal = getTotal();
+  const bill = buildBill({
+    items: items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price, mrp: i.originalPrice })),
+    subtotal,
+    discount: 0,
+    shipping: 0,
+    total: subtotal,
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full flex-1">
@@ -40,7 +48,12 @@ export default function CartPage() {
                         {item.name}
                       </Link>
                       <span className="text-sm text-muted-foreground mb-1">
-                        ₹{item.price.toLocaleString('en-IN')}
+                        {item.originalPrice && item.originalPrice > item.price && (
+                          <span className="line-through mr-2">₹{item.originalPrice.toLocaleString('en-IN')}</span>
+                        )}
+                        <span className={item.originalPrice && item.originalPrice > item.price ? "text-foreground font-medium" : ""}>
+                          ₹{item.price.toLocaleString('en-IN')}
+                        </span>
                       </span>
                       {item.size && (
                         <span className="text-xs text-muted-foreground">
@@ -99,6 +112,18 @@ export default function CartPage() {
             <div className="bg-secondary p-6">
               <h2 className="font-heading text-xl font-medium mb-6 border-b border-border/50 pb-4">Order Summary</h2>
               <div className="space-y-4 text-sm mb-6 border-b border-border/50 pb-6">
+                {bill.saleSavings > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total at MRP</span>
+                      <span className="text-muted-foreground line-through">₹{bill.mrpTotal.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between text-green-700">
+                      <span>Discount on MRP</span>
+                      <span className="font-medium">-₹{bill.saleSavings.toLocaleString('en-IN')}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-medium">₹{subtotal.toLocaleString('en-IN')}</span>
@@ -112,6 +137,9 @@ export default function CartPage() {
                 <span>Total</span>
                 <span>₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
+              {bill.saleSavings > 0 && (
+                <p className="-mt-4 mb-6 text-xs text-green-700">You are saving ₹{bill.saleSavings.toLocaleString('en-IN')} on this order.</p>
+              )}
               <Button className="w-full h-12 rounded-none font-semibold uppercase tracking-widest text-sm" asChild>
                 <Link href="/checkout">Proceed to Checkout</Link>
               </Button>

@@ -254,6 +254,7 @@ export async function createPendingOrder(input: CreateOrderInput): Promise<Creat
           name: l.name,
           quantity: l.quantity,
           price: l.unitPrice,
+          mrp: l.mrp,
           image: l.image,
         })),
       },

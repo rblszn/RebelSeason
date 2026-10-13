@@ -3,13 +3,15 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CATALOG_REVALIDATE_SECONDS, CATALOG_TAG } from "@/lib/cache";
 import { compareSizes } from "@/lib/catalog-config";
-import type { CatalogFilters } from "@/lib/catalog-filters";
+import { PRICE_RANGES, type CatalogFilters, type SortKey } from "@/lib/catalog-filters";
 
 // Cached, read-only queries for the public storefront. Results are shared by
 // every visitor and only re-queried when an admin edits the catalog, a purchase
 // changes stock, or the hourly safety revalidation runs. Admin pages keep
 // using the uncached functions in ./products and ./categories.
 
+// The cache outlives deployments. When a cached query's result shape changes, bump the
+// version suffix in its key (e.g. "-v2") so entries saved in the old shape are not reused.
 const cacheOptions = { tags: [CATALOG_TAG], revalidate: CATALOG_REVALIDATE_SECONDS };
 
 export const productCardSelect = {
@@ -49,7 +51,31 @@ function matchesFilters(filters: CatalogFilters | undefined): Prisma.ProductWher
   if (filters.finish.length) where.finish = { in: filters.finish };
   // Sizes are only worth filtering on while a piece is still in stock in that size.
   if (filters.size.length) where.variants = { some: { size: { in: filters.size }, stock: { gt: 0 } } };
+
+  // Several price ranges mean "any of these"; each of the groups below must also hold.
+  const all: Prisma.ProductWhereInput[] = [];
+  const ranges = PRICE_RANGES.filter((r) => filters.price.includes(r.id));
+  if (ranges.length) {
+    all.push({ OR: ranges.map((r) => ({ price: { gte: r.min, ...(r.max !== undefined ? { lt: r.max } : {}) } })) });
+  }
+  if (filters.instock.length) {
+    all.push({ OR: [{ hasVariants: false, stock: { gt: 0 } }, { hasVariants: true, variants: { some: { stock: { gt: 0 } } } }] });
+  }
+  if (all.length) where.AND = all;
   return where;
+}
+
+function orderFor(sort: SortKey | undefined): Prisma.ProductOrderByWithRelationInput[] {
+  switch (sort) {
+    case "price-asc":
+      return [{ price: "asc" }, { createdAt: "desc" }];
+    case "price-desc":
+      return [{ price: "desc" }, { createdAt: "desc" }];
+    case "best-sellers":
+      return [{ isBestSeller: "desc" }, { createdAt: "desc" }];
+    default:
+      return [{ createdAt: "desc" }];
+  }
 }
 
 export type StoreCategory = {
@@ -98,7 +124,7 @@ export const getHomePageData = unstable_cache(
     const settings = Object.fromEntries(settingsRows.map((s) => [s.key, s.value]));
     return { newArrivals, trending, categories, settings };
   },
-  ["home-page-data"],
+  ["home-page-data-v2"],
   cacheOptions
 );
 
@@ -131,13 +157,13 @@ export const getCategoryPageInfo = unstable_cache(
 );
 
 export const getProductPage = unstable_cache(
-  async (page: number, categorySlug: string | null, filters?: CatalogFilters) => {
+  async (page: number, categorySlug: string | null, filters?: CatalogFilters, sort?: SortKey) => {
     const where: Prisma.ProductWhereInput = { ...inCategory(categorySlug), ...matchesFilters(filters) };
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
         select: productCardSelect,
-        orderBy: { createdAt: "desc" },
+        orderBy: orderFor(sort),
         skip: (page - 1) * PRODUCTS_PER_PAGE,
         take: PRODUCTS_PER_PAGE,
       }),
@@ -145,7 +171,7 @@ export const getProductPage = unstable_cache(
     ]);
     return { products, total, totalPages: Math.max(1, Math.ceil(total / PRODUCTS_PER_PAGE)) };
   },
-  ["catalog-product-page"],
+  ["catalog-product-page-v3"],
   cacheOptions
 );
 
@@ -155,6 +181,9 @@ export type CatalogFacets = {
   material: string[];
   shape: string[];
   finish: string[];
+  /** Price range ids and the in-stock switch are offered whenever the section has products. */
+  price: string[];
+  instock: string[];
 };
 
 /** Every value a shopper can filter by in a department or category (or the whole shop). */
@@ -173,9 +202,18 @@ export const getCatalogFacets = unstable_cache(
     const shape = unique(rows.map((r) => r.shape));
     const finish = unique(rows.map((r) => r.finish));
 
-    return { color, material, shape, finish, size: sizeRows.map((r) => r.size).sort(compareSizes) };
+    const hasProducts = rows.length > 0;
+    return {
+      color,
+      material,
+      shape,
+      finish,
+      size: sizeRows.map((r) => r.size).sort(compareSizes),
+      price: hasProducts ? PRICE_RANGES.map((r) => r.id) : [],
+      instock: hasProducts ? ["1"] : [],
+    };
   },
-  ["catalog-facets"],
+  ["catalog-facets-v2"],
   cacheOptions
 );
 
@@ -214,7 +252,7 @@ export const getProductDetail = unstable_cache(
     });
     return { product, related };
   },
-  ["catalog-product-detail"],
+  ["catalog-product-detail-v2"],
   cacheOptions
 );
 

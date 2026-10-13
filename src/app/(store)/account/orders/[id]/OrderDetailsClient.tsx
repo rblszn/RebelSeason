@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { cldImage } from "@/lib/images";
 import { ArrowLeft, ExternalLink, Package } from "lucide-react";
+import { buildBill } from "@/lib/bill";
 
 export default function OrderDetailsClient({ order }: { order: any }) {
-  const subtotal = order.subtotal || order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-  const shipping = order.shipping || 0;
-  const discount = order.discount || 0;
-  const couponCode = order.couponCode;
+  const bill = buildBill(order);
   const paymentId = order.payment?.razorpayPaymentId || order.paymentId || "N/A";
 
   const formatDate = (dateString: string) => {
@@ -80,9 +78,16 @@ export default function OrderDetailsClient({ order }: { order: any }) {
                         <Link href={`/products/${item.product?.slug || ''}`} className="font-medium hover:underline">{item.name}</Link>
                         {item.variantName && <p className="text-sm text-muted-foreground mt-1">Size: {item.variantName}</p>}
                       </div>
-                      <p className="font-semibold">₹{(item.price * item.quantity).toLocaleString("en-IN")}</p>
+                      <div className="text-right">
+                        {item.mrp > item.price && (
+                          <p className="text-xs text-muted-foreground line-through">₹{(item.mrp * item.quantity).toLocaleString("en-IN")}</p>
+                        )}
+                        <p className="font-semibold">₹{(item.price * item.quantity).toLocaleString("en-IN")}</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-4">Qty: {item.quantity} × ₹{item.price.toLocaleString("en-IN")}</p>
+                    <p className="text-sm text-muted-foreground mt-4">
+                      Qty: {item.quantity} × {item.mrp > item.price && <span className="line-through mr-1">₹{item.mrp.toLocaleString("en-IN")}</span>}₹{item.price.toLocaleString("en-IN")}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -96,24 +101,49 @@ export default function OrderDetailsClient({ order }: { order: any }) {
               <h2 className="font-semibold">Order Summary</h2>
             </div>
             <div className="p-6 space-y-4 text-sm">
+              {bill.saleSavings > 0 && (
+                <>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Total at MRP</span>
+                    <span className="line-through">₹{bill.mrpTotal.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount on MRP</span>
+                    <span>-₹{bill.saleSavings.toLocaleString("en-IN")}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span>₹{subtotal.toLocaleString("en-IN")}</span>
+                <span>₹{bill.subtotal.toLocaleString("en-IN")}</span>
               </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>Shipping</span>
-                <span>{shipping > 0 ? `₹${shipping.toLocaleString("en-IN")}` : "Free"}</span>
-              </div>
-              {discount > 0 && (
+              {bill.couponDiscount > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>Discount {couponCode ? `(${couponCode})` : ""}</span>
-                  <span>-₹{discount.toLocaleString("en-IN")}</span>
+                  <span>Coupon discount {bill.couponCode ? `(${bill.couponCode})` : ""}</span>
+                  <span>-₹{bill.couponDiscount.toLocaleString("en-IN")}</span>
                 </div>
               )}
+              <div className="flex justify-between text-muted-foreground">
+                <span>Shipping</span>
+                <span>{bill.shipping > 0 ? `₹${bill.shipping.toLocaleString("en-IN")}` : "Free"}</span>
+              </div>
               <div className="flex justify-between font-bold text-base pt-4 border-t border-border">
                 <span>Total</span>
                 <span>₹{order.total.toLocaleString("en-IN")}</span>
               </div>
+              {bill.totalSavings > 0 && (
+                <p className="text-right text-xs text-green-600">You saved ₹{bill.totalSavings.toLocaleString("en-IN")} on this order.</p>
+              )}
+              {order.payment?.status === "CAPTURED" && (
+                <a
+                  href={`/api/account/orders/${order.id}/invoice?print=1`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block w-full border border-border py-2.5 text-center text-sm font-medium hover:bg-secondary/50 transition-colors"
+                >
+                  Download Invoice
+                </a>
+              )}
             </div>
           </div>
 

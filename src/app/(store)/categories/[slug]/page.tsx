@@ -8,7 +8,7 @@ import {
   parsePage,
 } from "@/lib/dal/catalog";
 import { isProductType, type ProductType } from "@/lib/catalog-config";
-import { parseFilters } from "@/lib/catalog-filters";
+import { parseFilters, parseSort } from "@/lib/catalog-filters";
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
@@ -32,6 +32,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   const page = parsePage(resolvedSearchParams.page);
   const filters = parseFilters(resolvedSearchParams);
+  const sort = parseSort(resolvedSearchParams);
 
   let title: string;
   let description: string | null = null;
@@ -79,7 +80,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   const basePath = `/categories/${resolvedParams.slug}`;
   const [{ products, total, totalPages }, facets] = await Promise.all([
-    getProductPage(page, categorySlug, filters),
+    getProductPage(page, categorySlug, filters, sort),
     getCatalogFacets(categorySlug),
   ]);
 
@@ -97,6 +98,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       page={page}
       facets={facets}
       filters={filters}
+      sort={sort}
     />
   );
 }
