@@ -9,9 +9,11 @@ import { getProductDetail } from "@/lib/dal/catalog";
 import { cldImage } from "@/lib/images";
 import { compareSizes, getTypeConfig, isProductType } from "@/lib/catalog-config";
 import { siteConfig } from "@/lib/site-config";
+import { isLive } from "@/lib/drop";
 
-// Rendered on first visit, then served from cache until the catalog changes.
-export const revalidate = 3600;
+// Rendered on first visit, then refreshed at most once a minute so a product scheduled for the
+// daily drop is reachable right after its release time.
+export const revalidate = 60;
 
 export async function generateStaticParams() {
   return [];
@@ -20,7 +22,7 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const data = await getProductDetail(slug);
-  if (!data) return { title: "Product not found" };
+  if (!data || !isLive(data.product.releaseAt)) return { title: "Product not found" };
   const { product } = data;
   return {
     title: product.name,
@@ -33,7 +35,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const { slug } = await params;
   const data = await getProductDetail(slug);
 
-  if (!data) {
+  // Products scheduled for a later drop are not public yet.
+  if (!data || !isLive(data.product.releaseAt)) {
     return notFound();
   }
   const { product, related: relatedProducts } = data;

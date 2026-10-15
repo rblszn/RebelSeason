@@ -3,8 +3,12 @@ import { revalidateTag } from "next/cache";
 /** Tag attached to every cached storefront query (products, categories, settings). */
 export const CATALOG_TAG = "catalog";
 
-/** Safety net: cached catalog data is refreshed at least this often (seconds). */
-export const CATALOG_REVALIDATE_SECONDS = 3600;
+/**
+ * Cached catalog data is refreshed at least this often (seconds). Kept short because
+ * products can be scheduled to go live at a set time (the daily 8:30 AM drop), and the
+ * storefront should pick that up within a minute of the release.
+ */
+export const CATALOG_REVALIDATE_SECONDS = 60;
 
 /**
  * Invalidate cached storefront data.

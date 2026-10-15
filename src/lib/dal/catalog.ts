@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { CATALOG_REVALIDATE_SECONDS, CATALOG_TAG } from "@/lib/cache";
 import { compareSizes } from "@/lib/catalog-config";
 import { PRICE_RANGES, type CatalogFilters, type SortKey } from "@/lib/catalog-filters";
+import { dropWindowStart, nextDropTime } from "@/lib/drop";
 
 // Cached, read-only queries for the public storefront. Results are shared by
 // every visitor and only re-queried when an admin edits the catalog, a purchase
@@ -31,6 +32,16 @@ export const productCardSelect = {
 export type ProductCardData = Prisma.ProductGetPayload<{ select: typeof productCardSelect }>;
 
 export const PRODUCTS_PER_PAGE = 12;
+
+/** Products that have gone live: no release time (added before drops existed), or one that has passed. */
+function liveNow(now: Date): Prisma.ProductWhereInput {
+  return { OR: [{ releaseAt: null }, { releaseAt: { lte: now } }] };
+}
+
+/** Products currently in the Daily Drop section (they leave it, and join New Arrivals, after 24 hours). */
+function inDropWindow(now: Date): Prisma.ProductWhereInput {
+  return { isDrop: true, releaseAt: { gt: dropWindowStart(now), lte: now } };
+}
 
 const categoryOrder = [{ sortOrder: "asc" }, { name: "asc" }] satisfies Prisma.CategoryOrderByWithRelationInput[];
 
@@ -65,16 +76,22 @@ function matchesFilters(filters: CatalogFilters | undefined): Prisma.ProductWher
   return where;
 }
 
+// Newest means most recently released; products added before release times existed come after them, by date added.
+const newestFirst: Prisma.ProductOrderByWithRelationInput[] = [
+  { releaseAt: { sort: "desc", nulls: "last" } },
+  { createdAt: "desc" },
+];
+
 function orderFor(sort: SortKey | undefined): Prisma.ProductOrderByWithRelationInput[] {
   switch (sort) {
     case "price-asc":
-      return [{ price: "asc" }, { createdAt: "desc" }];
+      return [{ price: "asc" }, ...newestFirst];
     case "price-desc":
-      return [{ price: "desc" }, { createdAt: "desc" }];
+      return [{ price: "desc" }, ...newestFirst];
     case "best-sellers":
-      return [{ isBestSeller: "desc" }, { createdAt: "desc" }];
+      return [{ isBestSeller: "desc" }, ...newestFirst];
     default:
-      return [{ createdAt: "desc" }];
+      return newestFirst;
   }
 }
 
@@ -106,12 +123,32 @@ export const getCatalogCategories = unstable_cache(
 
 export const getHomePageData = unstable_cache(
   async () => {
-    const [newArrivals, trending, categories, settingsRows] = await Promise.all([
-      prisma.product.findMany({ select: productCardSelect, orderBy: { createdAt: "desc" }, take: 8 }),
+    const now = new Date();
+    // Pieces in today's drop are shown in their own section, so New Arrivals and Trending leave them out.
+    const notInDrop: Prisma.ProductWhereInput = { NOT: { isDrop: true, releaseAt: { gt: dropWindowStart(now) } } };
+    const [dropRows, dropEverUsed, upcomingDrop, newArrivals, trending, categories, settingsRows] = await Promise.all([
       prisma.product.findMany({
-        where: { isBestSeller: true },
+        where: inDropWindow(now),
+        select: { ...productCardSelect, releaseAt: true },
+        orderBy: { releaseAt: "desc" },
+        take: 16,
+      }),
+      prisma.product.findFirst({ where: { isDrop: true }, select: { id: true } }),
+      prisma.product.findFirst({
+        where: { isDrop: true, releaseAt: { gt: now } },
+        orderBy: { releaseAt: "asc" },
+        select: { releaseAt: true },
+      }),
+      prisma.product.findMany({
+        where: { AND: [liveNow(now), notInDrop] },
         select: productCardSelect,
-        orderBy: { createdAt: "desc" },
+        orderBy: newestFirst,
+        take: 8,
+      }),
+      prisma.product.findMany({
+        where: { AND: [liveNow(now), notInDrop, { isBestSeller: true }] },
+        select: productCardSelect,
+        orderBy: newestFirst,
         take: 8,
       }),
       prisma.category.findMany({
@@ -122,9 +159,20 @@ export const getHomePageData = unstable_cache(
       prisma.setting.findMany(),
     ]);
     const settings = Object.fromEntries(settingsRows.map((s) => [s.key, s.value]));
-    return { newArrivals, trending, categories, settings };
+
+    // The countdown aims at the earlier of the next daily slot and any piece scheduled sooner.
+    const slot = nextDropTime(now);
+    const nextDropAt = upcomingDrop?.releaseAt && upcomingDrop.releaseAt < slot ? upcomingDrop.releaseAt : slot;
+    const drop = {
+      // Dates are not kept through the cache, so they are stored as ISO strings.
+      products: dropRows.map((p) => ({ ...p, releaseAt: (p.releaseAt as Date).toISOString() })),
+      // Only tease the next drop once the store has actually used the feature.
+      enabled: dropEverUsed !== null,
+      nextDropAt: nextDropAt.toISOString(),
+    };
+    return { drop, newArrivals, trending, categories, settings };
   },
-  ["home-page-data-v2"],
+  ["home-page-data-v3"],
   cacheOptions
 );
 
@@ -158,7 +206,9 @@ export const getCategoryPageInfo = unstable_cache(
 
 export const getProductPage = unstable_cache(
   async (page: number, categorySlug: string | null, filters?: CatalogFilters, sort?: SortKey) => {
-    const where: Prisma.ProductWhereInput = { ...inCategory(categorySlug), ...matchesFilters(filters) };
+    const where: Prisma.ProductWhereInput = {
+      AND: [liveNow(new Date()), inCategory(categorySlug), matchesFilters(filters)],
+    };
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
@@ -171,7 +221,7 @@ export const getProductPage = unstable_cache(
     ]);
     return { products, total, totalPages: Math.max(1, Math.ceil(total / PRODUCTS_PER_PAGE)) };
   },
-  ["catalog-product-page-v3"],
+  ["catalog-product-page-v4"],
   cacheOptions
 );
 
@@ -189,7 +239,7 @@ export type CatalogFacets = {
 /** Every value a shopper can filter by in a department or category (or the whole shop). */
 export const getCatalogFacets = unstable_cache(
   async (categorySlug: string | null): Promise<CatalogFacets> => {
-    const base = inCategory(categorySlug);
+    const base: Prisma.ProductWhereInput = { AND: [liveNow(new Date()), inCategory(categorySlug)] };
     const [rows, sizeRows] = await Promise.all([
       prisma.product.findMany({ where: base, select: { color: true, material: true, shape: true, finish: true } }),
       prisma.productVariant.findMany({ where: { product: base }, select: { size: true }, distinct: ["size"] }),
@@ -213,7 +263,7 @@ export const getCatalogFacets = unstable_cache(
       instock: hasProducts ? ["1"] : [],
     };
   },
-  ["catalog-facets-v2"],
+  ["catalog-facets-v3"],
   cacheOptions
 );
 
@@ -238,6 +288,7 @@ export const getProductDetail = unstable_cache(
         hasVariants: true,
         stock: true,
         categoryId: true,
+        releaseAt: true,
         category: { select: { name: true, slug: true, type: true, parent: { select: { name: true, slug: true } } } },
         variants: { select: { id: true, size: true, stock: true } },
       },
@@ -245,14 +296,15 @@ export const getProductDetail = unstable_cache(
     if (!product) return null;
 
     const related = await prisma.product.findMany({
-      where: { categoryId: product.categoryId, id: { not: product.id } },
+      where: { AND: [{ categoryId: product.categoryId, id: { not: product.id } }, liveNow(new Date())] },
       select: productCardSelect,
-      orderBy: { createdAt: "desc" },
+      orderBy: newestFirst,
       take: 4,
     });
-    return { product, related };
+    // The release time travels as an ISO string (dates do not survive the cache); the page hides unreleased products.
+    return { product: { ...product, releaseAt: product.releaseAt ? product.releaseAt.toISOString() : null }, related };
   },
-  ["catalog-product-detail-v2"],
+  ["catalog-product-detail-v3"],
   cacheOptions
 );
 

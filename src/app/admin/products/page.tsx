@@ -4,6 +4,7 @@ import { getAllProducts, getProductsCount } from "@/lib/dal/products";
 import { Pagination } from "@/components/ui/Pagination";
 import Image from "next/image";
 import { ProductActions } from "./ProductActions";
+import { dropStatus, formatDropDateTime } from "@/lib/drop";
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +42,14 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
               <th className="p-4 font-medium">Category</th>
               <th className="p-4 font-medium">Price</th>
               <th className="p-4 font-medium">Stock</th>
+              <th className="p-4 font-medium">Release</th>
               <th className="p-4 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {products.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-500">
+                <td colSpan={7} className="p-4 text-center text-gray-500">
                   No products found.
                 </td>
               </tr>
@@ -84,6 +86,29 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
                       ? `${product.variants?.reduce((sum, v) => sum + (v.stock || 0), 0) || 0} (Variants)`
                       : product.stock
                     }
+                  </td>
+                  <td className="p-4 text-sm">
+                    {(() => {
+                      const status = dropStatus(product);
+                      if (status === "scheduled") {
+                        return (
+                          <span className="inline-flex flex-col">
+                            <span className="inline-flex w-fit items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                              Scheduled
+                            </span>
+                            <span className="mt-1 text-xs text-gray-500">{formatDropDateTime(product.releaseAt as Date)}</span>
+                          </span>
+                        );
+                      }
+                      if (status === "in-drop") {
+                        return (
+                          <span className="inline-flex w-fit items-center rounded-full bg-pink-50 px-2 py-0.5 text-xs font-medium text-pink-700 ring-1 ring-inset ring-pink-600/20">
+                            In Daily Drop
+                          </span>
+                        );
+                      }
+                      return <span className="text-xs text-gray-400">Live</span>;
+                    })()}
                   </td>
                   <td className="p-4">
                     <ProductActions productId={product.id} />

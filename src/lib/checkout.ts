@@ -63,7 +63,7 @@ export async function priceCart(items: CartInput): Promise<PricingResult> {
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
     select: {
-      id: true, name: true, price: true, originalPrice: true, images: true, stock: true, hasVariants: true,
+      id: true, name: true, price: true, originalPrice: true, images: true, stock: true, hasVariants: true, releaseAt: true,
       variants: { select: { id: true, size: true, stock: true } },
     },
   });
@@ -72,7 +72,8 @@ export async function priceCart(items: CartInput): Promise<PricingResult> {
   const lines: PricedLine[] = [];
   for (const line of merged.values()) {
     const product = byId.get(line.productId);
-    if (!product) {
+    // Pieces scheduled for a later drop cannot be bought before their release time.
+    if (!product || (product.releaseAt && product.releaseAt.getTime() > Date.now())) {
       return { ok: false, error: "A product in your cart is no longer available. Please remove it and try again.", productId: line.productId };
     }
 

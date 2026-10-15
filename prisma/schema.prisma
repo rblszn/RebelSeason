@@ -147,6 +147,8 @@ model Product {
   shape            String? // Nail extensions
   finish           String? // Nail extensions
   dimensions       String? // Bags: size as dimensions, e.g. "30 x 12 x 25 cm"
+  releaseAt        DateTime? // When the product goes live. Hidden before this time; null = live since it was added
+  isDrop           Boolean  @default(false) // Featured in the homepage Daily Drop for 24 hours after releaseAt
   careInstructions String?
   features         String[]
   createdAt        DateTime @default(now())
@@ -158,6 +160,7 @@ model Product {
   reviews    Review[]
 
   @@index([categoryId])
+  @@index([releaseAt])
   @@map("products")
 }
 

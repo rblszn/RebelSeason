@@ -61,3 +61,13 @@ Applying the schema and creating the departments on an existing database:
 npx prisma db push
 node scripts/setup-categories.js
 ```
+
+## Daily Drop
+
+New pieces are released once a day at 8:30 AM IST. All the timing rules live in `src/lib/drop.ts`.
+
+- `Product.releaseAt`: when the product goes live. It is hidden from the whole storefront (home, shop, categories, its own page, and checkout) until then. `null` means it was added before drops existed and is simply live.
+- `Product.isDrop`: show the product in the homepage **Daily Drop** section for 24 hours after `releaseAt`. After that it leaves the section on its own and appears in New Arrivals, which is ordered by release time.
+- In the admin product form, a new product defaults to "Next daily drop" (hidden until the next 8:30 AM). Other choices: right now, a custom date and time, or (when editing) keep as it is. Untick "Feature in the Daily Drop" to add a regular product.
+- The homepage and cached catalog queries refresh every 60 seconds, and the on-page countdown re-fetches when it reaches zero, so a release shows up within about a minute of its time.
+- Between drops, once the store has used drops at least once, the section turns into a "next drop in ..." teaser.

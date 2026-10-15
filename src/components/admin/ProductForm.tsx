@@ -7,6 +7,16 @@ import { Upload, X, Loader2, Trash2, Plus } from "lucide-react";
 import { uploadToCloudinary } from "@/lib/cloudinary-upload";
 import type { ProductWithRelations } from "@/lib/dal/products";
 import {
+  DROP_TIME_LABEL,
+  DROP_VISIBLE_MS,
+  dropStatus,
+  formatDropDateTime,
+  fromISTInputValue,
+  nextDropTime,
+  toISTInputValue,
+  type ReleaseMode,
+} from "@/lib/drop";
+import {
   compareSizes,
   getSizePresetGroups,
   getTypeConfig,
@@ -84,6 +94,14 @@ export default function ProductForm({ initialData, categories }: ProductFormProp
       : []
   );
   const [customSize, setCustomSize] = useState("");
+
+  // When the product goes live. New products default to the next daily drop; edits keep what is stored.
+  const [releaseMode, setReleaseMode] = useState<ReleaseMode>(initialData ? "keep" : "next-drop");
+  const [customReleaseAt, setCustomReleaseAt] = useState(
+    initialData?.releaseAt ? toISTInputValue(initialData.releaseAt) : toISTInputValue(nextDropTime(new Date()))
+  );
+  const [isDrop, setIsDrop] = useState(initialData ? initialData.isDrop : true);
+  const currentStatus = initialData ? dropStatus(initialData) : null;
 
   // Required departments always have sizes; "none" departments never do.
   const usesSizes = config.size.mode === "required" || (config.size.mode === "optional" && formData.hasVariants);
@@ -182,6 +200,17 @@ export default function ProductForm({ initialData, categories }: ProductFormProp
       (Object.keys(attributes) as AttributeKey[]).map((key) => [key, usedKeys.has(key) ? attributes[key].trim() || null : null])
     );
 
+    let customReleaseIso: string | null = null;
+    if (releaseMode === "custom") {
+      const at = fromISTInputValue(customReleaseAt);
+      if (!at) {
+        setError("Choose a valid release date and time.");
+        setLoading(false);
+        return;
+      }
+      customReleaseIso = at.toISOString();
+    }
+
     const variants = usesSizes ? sizes.map((s) => ({ size: s.size, stock: parseInt(s.stock) || 0 })) : [];
     const payload = {
       ...formData,
@@ -190,6 +219,9 @@ export default function ProductForm({ initialData, categories }: ProductFormProp
       price: parseInt(formData.price) || 0,
       originalPrice: formData.originalPrice ? parseInt(formData.originalPrice) : null,
       hasVariants: usesSizes,
+      releaseMode,
+      releaseAt: customReleaseIso,
+      isDrop,
       stock: usesSizes ? variants.reduce((sum, v) => sum + v.stock, 0) : parseInt(formData.stock) || 0,
       variants,
     };
@@ -334,6 +366,93 @@ export default function ProductForm({ initialData, categories }: ProductFormProp
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
+        <h2 className="text-xl font-semibold text-gray-800 border-b pb-2 mb-1">When does it go live?</h2>
+        <p className="text-sm text-gray-500">
+          New pieces are released every day at {DROP_TIME_LABEL}. They stay hidden from customers until the release time, show in the
+          homepage Daily Drop for 24 hours, then move to New Arrivals on their own.
+        </p>
+
+        {initialData && currentStatus && (
+          <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            Right now:{" "}
+            <strong>
+              {currentStatus === "scheduled"
+                ? `Scheduled for ${formatDropDateTime(initialData.releaseAt as Date)}. Not visible to customers yet.`
+                : currentStatus === "in-drop"
+                  ? `In today's Daily Drop (released ${formatDropDateTime(initialData.releaseAt as Date)})`
+                  : initialData.releaseAt
+                    ? `Live since ${formatDropDateTime(initialData.releaseAt)}`
+                    : "Live"}
+            </strong>
+          </p>
+        )}
+
+        <div className="space-y-2" role="radiogroup" aria-label="Release time">
+          {(
+            [
+              ...(initialData ? [{ mode: "keep" as const, title: "Keep as it is", hint: "Don't change when it goes live." }] : []),
+              {
+                mode: "next-drop" as const,
+                title: `Next daily drop · ${formatDropDateTime(nextDropTime(new Date()))}`,
+                hint: "Hidden until then. Recommended for new pieces.",
+              },
+              { mode: "now" as const, title: "Right now", hint: "Goes live as soon as you save." },
+              { mode: "custom" as const, title: "Pick a date and time", hint: "Schedule it for any time, in Indian time." },
+            ] satisfies { mode: ReleaseMode; title: string; hint: string }[]
+          ).map((option) => (
+            <label
+              key={option.mode}
+              className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${
+                releaseMode === option.mode ? "border-black bg-gray-50" : "border-gray-200 hover:border-gray-400"
+              }`}
+            >
+              <input
+                type="radio"
+                name="releaseMode"
+                value={option.mode}
+                checked={releaseMode === option.mode}
+                onChange={() => setReleaseMode(option.mode)}
+                className="mt-1 h-4 w-4 text-black focus:ring-black"
+              />
+              <span>
+                <span className="block text-sm font-medium text-gray-800">{option.title}</span>
+                <span className="block text-xs text-gray-500">{option.hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+
+        {releaseMode === "custom" && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Release date and time (IST)</label>
+            <input
+              type="datetime-local"
+              value={customReleaseAt}
+              onChange={(e) => setCustomReleaseAt(e.target.value)}
+              className={`${inputClass} max-w-xs`}
+            />
+          </div>
+        )}
+
+        {(releaseMode !== "keep" || currentStatus === "scheduled" || currentStatus === "in-drop") && (
+          <label className="flex cursor-pointer items-start gap-3 rounded-md bg-pink-50/60 p-3">
+            <input
+              type="checkbox"
+              checked={isDrop}
+              onChange={(e) => setIsDrop(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-800">Feature in the Daily Drop</span>
+              <span className="block text-xs text-gray-500">
+                Show it in the homepage Daily Drop for {DROP_VISIBLE_MS / 3600000} hours after release. Untick to add it as a regular product.
+              </span>
+            </span>
+          </label>
+        )}
       </div>
 
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">

@@ -7,6 +7,7 @@ import {
   unusedAttributeKeys,
   validateProductAttributes,
 } from "@/lib/catalog-config";
+import { resolveRelease } from "@/lib/drop";
 
 const attribute = z.string().max(120).nullish();
 
@@ -35,6 +36,12 @@ export const productInputSchema = z.object({
   finish: attribute,
   dimensions: attribute,
   careInstructions: z.string().max(1000).nullish(),
+  /** When the product goes live: keep the stored time, the next daily drop, right now, or a custom time. */
+  releaseMode: z.enum(["keep", "next-drop", "now", "custom"]).optional(),
+  /** ISO time for releaseMode "custom". */
+  releaseAt: z.string().max(40).nullish(),
+  /** Feature the product in the homepage Daily Drop for 24 hours after it goes live. */
+  isDrop: z.boolean().optional(),
   features: z.array(z.string().max(200)).max(50).optional(),
   variants: z
     .array(z.object({ size: z.string().trim().min(1).max(20), stock: z.number().int().min(0) }))
@@ -66,7 +73,11 @@ export async function checkProductCategory(input: ProductInput): Promise<Categor
 
 /** The prisma data for a product row, with attributes cleaned and the stock total derived from sizes. */
 export function productData(input: ProductInput, type: string) {
-  const { variants, originalPrice, ...rest } = input;
+  // Release settings are resolved separately (see releaseData), not stored as sent.
+  const { variants, originalPrice, releaseMode, releaseAt, isDrop, ...rest } = input;
+  void releaseMode;
+  void releaseAt;
+  void isDrop;
   const attributes = {
     material: normalizeAttribute(input.material),
     color: normalizeAttribute(input.color),
@@ -89,6 +100,30 @@ export function productData(input: ProductInput, type: string) {
         ? Math.round(((originalPrice - input.price) / originalPrice) * 100)
         : null,
   };
+}
+
+export type ReleaseData =
+  | { ok: true; data: { releaseAt?: Date; isDrop?: boolean } }
+  | { ok: false; error: string };
+
+/**
+ * The release time and Daily Drop flag to store. A new product defaults to
+ * going live right away as a regular listing; an edit defaults to leaving the
+ * stored release time alone. `existingReleaseAt` is the stored time on an edit.
+ */
+export function releaseData(input: ProductInput, creating: boolean, existingReleaseAt?: Date | null): ReleaseData {
+  const mode = input.releaseMode ?? (creating ? "now" : "keep");
+  const resolved = resolveRelease(mode, input.releaseAt);
+  if ("error" in resolved) return { ok: false, error: resolved.error };
+
+  const data: { releaseAt?: Date; isDrop?: boolean } = {};
+  if (resolved.releaseAt) data.releaseAt = resolved.releaseAt;
+  if (input.isDrop !== undefined) data.isDrop = input.isDrop;
+  else if (creating) data.isDrop = false;
+
+  // A product with no release time (added before drops existed) cannot be in the drop unless it gets one.
+  if (data.releaseAt === undefined && !creating && !existingReleaseAt) data.isDrop = false;
+  return { ok: true, data };
 }
 
 /**
