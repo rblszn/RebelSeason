@@ -10,6 +10,9 @@ import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
+// Compared against when an account has no password, so a missing password costs the same time as a wrong one.
+const NO_PASSWORD_HASH = "$2b$10$4zRr3Y3yHAyUap1om1Wa/er4KIS3fJvCX1EXTiGY3HQgDLxVX/n.2";
+
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
@@ -55,8 +58,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify password with bcrypt
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // Verify password with bcrypt. Phone-only shop customers and PIN-only staff have no password,
+    // so they cannot sign in here; the comparison still runs so the response time is the same.
+    const isPasswordValid = user.password
+      ? await bcrypt.compare(password, user.password)
+      : (await bcrypt.compare(password, NO_PASSWORD_HASH), false);
     if (!isPasswordValid) {
       return NextResponse.json(
         { error: "Invalid email or password" },
@@ -85,7 +91,7 @@ export async function POST(request: Request) {
     if (user.role === "ADMIN") {
       const adminSession = await getAdminSession();
       adminSession.userId = user.id;
-      adminSession.email = user.email;
+      adminSession.email = user.email ?? email;
       adminSession.name = user.name;
       adminSession.role = "ADMIN";
       adminSession.isLoggedIn = true;
@@ -107,7 +113,7 @@ export async function POST(request: Request) {
     } else {
       const customerSession = await getCustomerSession();
       customerSession.userId = user.id;
-      customerSession.email = user.email;
+      customerSession.email = user.email ?? email;
       customerSession.name = user.name;
       customerSession.role = "CUSTOMER";
       customerSession.isLoggedIn = true;

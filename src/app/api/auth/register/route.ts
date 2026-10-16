@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { mergeShopCustomerInto, phoneForStorage } from "@/lib/pos/customer";
 import { checkOtp, getCustomerSession, issueOtp, otpErrorMessage, setDisplayNameCookie } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/mail";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -52,9 +53,12 @@ export async function POST(request: Request) {
         },
       });
 
+      // If this number was already used for a shop purchase, bring that history across.
+      await mergeShopCustomerInto(user.id, user.phone);
+
       session.pendingUser = undefined;
       session.userId = user.id;
-      session.email = user.email;
+      session.email = user.email ?? pendingUser.email;
       session.name = user.name;
       session.role = "CUSTOMER";
       session.isLoggedIn = true;
@@ -108,7 +112,7 @@ export async function POST(request: Request) {
     session.pendingUser = {
       name: name.trim().slice(0, 100),
       email: normalizedEmail,
-      phone: typeof phone === "string" && phone.trim() ? phone.trim().slice(0, 20) : undefined,
+      phone: phoneForStorage(phone) ?? undefined,
       passwordHash: hashedPassword,
     };
     await session.save();

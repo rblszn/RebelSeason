@@ -170,7 +170,7 @@ async function main() {
       total: 4999,
       status: "DELIVERED",
       customerName: customer1.name,
-      customerEmail: customer1.email,
+      customerEmail: customer1.email ?? "",
       customerPhone: customer1.phone,
       shippingAddress: { name: "Priya Sharma", street: "42 MG Road, Sector 17", city: "Gurgaon", state: "Haryana", pincode: "122001" },
       items: {
@@ -202,7 +202,7 @@ async function main() {
       total: 7499,
       status: "SHIPPED",
       customerName: customer2.name,
-      customerEmail: customer2.email,
+      customerEmail: customer2.email ?? "",
       shippingAddress: { name: "Ananya Gupta", street: "15 Park Street", city: "Mumbai", state: "Maharashtra", pincode: "400001" },
       items: {
         create: {
@@ -232,7 +232,7 @@ async function main() {
       total: 5498,
       status: "PENDING",
       customerName: customer3.name,
-      customerEmail: customer3.email,
+      customerEmail: customer3.email ?? "",
       shippingAddress: { name: "Riya Patel", street: "8 Ashram Road", city: "Ahmedabad", state: "Gujarat", pincode: "380009" },
       items: {
         create: [
@@ -259,7 +259,7 @@ async function main() {
       total: 3999,
       status: "CONFIRMED",
       customerName: customer1.name,
-      customerEmail: customer1.email,
+      customerEmail: customer1.email ?? "",
       customerPhone: customer1.phone,
       shippingAddress: { name: "Priya Sharma", street: "42 MG Road, Sector 17", city: "Gurgaon", state: "Haryana", pincode: "122001" },
       items: {
@@ -279,7 +279,7 @@ async function main() {
       total: 2799,
       status: "PROCESSING",
       customerName: customer2.name,
-      customerEmail: customer2.email,
+      customerEmail: customer2.email ?? "",
       shippingAddress: { name: "Ananya Gupta", street: "15 Park Street", city: "Mumbai", state: "Maharashtra", pincode: "400001" },
       items: {
         create: { productId: createdProducts[5].id, name: createdProducts[5].name, quantity: 1, price: 2799, image: createdProducts[5].images[0], variantName: "30" },

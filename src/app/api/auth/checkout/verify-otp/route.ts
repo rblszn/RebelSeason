@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
+import { mergeShopCustomerInto, phoneForStorage } from "@/lib/pos/customer";
 import { checkOtp, getCustomerSession, otpErrorMessage, setDisplayNameCookie } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       create: {
         name: finalName.slice(0, 100),
         email,
-        phone: typeof phone === "string" && phone.trim() ? phone.trim().slice(0, 20) : null,
+        phone: phoneForStorage(phone),
         password: randomPassword,
         role: "CUSTOMER",
       },
@@ -53,8 +54,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Please log in to continue." }, { status: 403 });
     }
 
+    // If this number was already used for a shop purchase, bring that history across.
+    await mergeShopCustomerInto(user.id, user.phone);
+
     session.userId = user.id;
-    session.email = user.email;
+    session.email = user.email ?? email;
     session.name = user.name;
     session.role = "CUSTOMER";
     session.isLoggedIn = true;

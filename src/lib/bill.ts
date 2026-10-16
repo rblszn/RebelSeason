@@ -17,6 +17,8 @@ export interface BillOrderInput {
   subtotal: number;
   /** Coupon discount. */
   discount: number;
+  /** Discount given at the shop counter (shop bills only). */
+  manualDiscount?: number;
   shipping: number;
   total: number;
   couponCode?: string | null;
@@ -45,9 +47,11 @@ export interface Bill {
   subtotal: number;
   couponCode: string | null;
   couponDiscount: number;
+  /** Discount given at the shop counter; 0 for website orders. */
+  manualDiscount: number;
   shipping: number;
   total: number;
-  /** Sale savings plus coupon discount. */
+  /** Sale savings plus coupon and counter discounts. */
   totalSavings: number;
 }
 
@@ -75,6 +79,7 @@ export function buildBill(order: BillOrderInput): Bill {
   );
   const saleSavings = Math.max(0, mrpTotal - subtotal);
   const couponDiscount = Math.max(0, order.discount || 0);
+  const manualDiscount = Math.max(0, order.manualDiscount || 0);
 
   return {
     lines,
@@ -83,9 +88,10 @@ export function buildBill(order: BillOrderInput): Bill {
     subtotal,
     couponCode: order.couponCode || null,
     couponDiscount,
+    manualDiscount,
     shipping: order.shipping || 0,
     total: order.total,
-    totalSavings: saleSavings + couponDiscount,
+    totalSavings: saleSavings + couponDiscount + manualDiscount,
   };
 }
 

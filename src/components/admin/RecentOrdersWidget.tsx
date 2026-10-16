@@ -123,7 +123,7 @@ export function RecentOrdersWidget({ orders }: RecentOrdersWidgetProps) {
                         {order.customerName}
                       </div>
                       <div className="text-[11px] text-gray-500">
-                        {order.customerEmail}
+                        {order.customerEmail || order.customerPhone}
                       </div>
                     </td>
                     <td className="py-3.5 pr-4">{getStatusBadge(order.status)}</td>

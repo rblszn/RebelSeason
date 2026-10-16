@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAllProducts } from "@/lib/dal/products";
 import { revalidateCatalog } from "@/lib/cache";
+import { getAdminSession } from "@/lib/auth";
+import { logStockEdit, snapshotProductStock } from "@/lib/pos/stock";
 import { checkProductCategory, productData, productInputSchema, prismaErrorResponse, releaseData } from "@/lib/admin-products";
 
 export async function GET() {
@@ -39,6 +41,10 @@ export async function POST(req: NextRequest) {
         variants: true,
       },
     });
+
+    // Record the opening stock in the stock history.
+    const admin = await getAdminSession();
+    await logStockEdit(prisma, admin.userId ?? null, [], await snapshotProductStock(prisma, product.id), true);
 
     revalidateCatalog();
     return NextResponse.json(product);

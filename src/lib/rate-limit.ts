@@ -108,3 +108,12 @@ if (typeof setInterval !== 'undefined') {
     }
   }, 60 * 60 * 1000);
 }
+
+/**
+ * Keyed limiter used by the shop POS routes: `limit` calls per `windowSeconds` for `key`.
+ * Thin wrapper over checkRateLimit (Redis when configured, in-memory otherwise).
+ */
+export async function rateLimit({ key, limit, windowSeconds }: { key: string; limit: number; windowSeconds: number }) {
+  const success = await checkRateLimit(key, "pos", limit, windowSeconds * 1000);
+  return { success };
+}

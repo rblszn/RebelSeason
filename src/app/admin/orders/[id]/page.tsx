@@ -23,6 +23,9 @@ export default async function OrderDetailPage({
   }
 
   const bill = buildBill(order);
+  // Shop bills come from the POS: no shipping, tracking or status changes here.
+  const isShop = order.channel === "POS";
+  const cancelled = order.status === "CANCELLED";
 
   const address = typeof order.shippingAddress === 'string' 
     ? JSON.parse(order.shippingAddress) 
@@ -36,8 +39,11 @@ export default async function OrderDetailPage({
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            Order #{order.orderNumber}
+            {isShop ? "Shop bill" : "Order"} #{order.orderNumber}
           </h1>
+          {isShop && (
+            <span className="rounded-full bg-gray-900 px-2.5 py-0.5 text-xs font-medium text-white">Shop</span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <a
@@ -48,7 +54,17 @@ export default async function OrderDetailPage({
           >
             <Download className="h-4 w-4" /> Download Invoice
           </a>
-          <OrderStatusSelect orderId={order.id} initialStatus={order.status} />
+          {isShop ? (
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-medium ring-1 ring-inset ${
+                cancelled ? "bg-red-50 text-red-700 ring-red-600/10" : "bg-green-50 text-green-700 ring-green-600/20"
+              }`}
+            >
+              {cancelled ? "Cancelled" : "Paid at the shop"}
+            </span>
+          ) : (
+            <OrderStatusSelect orderId={order.id} initialStatus={order.status} />
+          )}
         </div>
       </div>
 
@@ -112,10 +128,18 @@ export default async function OrderDetailPage({
                   <p>-₹{bill.couponDiscount.toLocaleString('en-IN')}</p>
                 </div>
               )}
-              <div className="flex justify-between text-gray-500">
-                <p>Shipping</p>
-                <p>{bill.shipping > 0 ? `₹${bill.shipping.toLocaleString('en-IN')}` : 'Free'}</p>
-              </div>
+              {bill.manualDiscount > 0 && (
+                <div className="flex justify-between text-green-700">
+                  <p>Discount at the counter{order.approvedBy ? ` (approved by ${order.approvedBy.name || order.approvedBy.email})` : ""}</p>
+                  <p>-₹{bill.manualDiscount.toLocaleString('en-IN')}</p>
+                </div>
+              )}
+              {!isShop && (
+                <div className="flex justify-between text-gray-500">
+                  <p>Shipping</p>
+                  <p>{bill.shipping > 0 ? `₹${bill.shipping.toLocaleString('en-IN')}` : 'Free'}</p>
+                </div>
+              )}
               <div className="flex justify-between border-t border-gray-200 pt-3 text-base font-semibold text-gray-900">
                 <p>Total</p>
                 <p>₹{order.total.toLocaleString('en-IN')}</p>
@@ -136,9 +160,23 @@ export default async function OrderDetailPage({
                 <p className="font-medium text-gray-900">{order.customerName}</p>
               </div>
               <div>
-                <p className="text-gray-500">Email</p>
-                <p className="font-medium text-gray-900">{order.customerEmail}</p>
+                <p className="text-gray-500">{isShop ? "Contact" : "Email"}</p>
+                <p className="font-medium text-gray-900">
+                  {isShop ? [order.customerPhone, order.customerEmail].filter(Boolean).join(" · ") || "-" : order.customerEmail}
+                </p>
               </div>
+              {isShop && order.cashier && (
+                <div>
+                  <p className="text-gray-500">Served by</p>
+                  <p className="font-medium text-gray-900">{order.cashier.name || order.cashier.email}</p>
+                </div>
+              )}
+              {isShop && cancelled && (
+                <div>
+                  <p className="text-gray-500">Cancelled</p>
+                  <p className="font-medium text-red-700">{order.cancelReason || "No reason given"}</p>
+                </div>
+              )}
               <div>
                 <p className="text-gray-500">Date</p>
                 <p className="font-medium text-gray-900">
@@ -148,6 +186,7 @@ export default async function OrderDetailPage({
             </div>
           </div>
 
+          {!isShop && (
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Shipping Address</h2>
             {address ? (
@@ -161,7 +200,9 @@ export default async function OrderDetailPage({
               <p className="text-sm text-gray-500">No shipping address available</p>
             )}
           </div>
+          )}
 
+          {!isShop && (
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Tracking Information</h2>
             {(order as any).trackingUrl ? (
@@ -177,8 +218,36 @@ export default async function OrderDetailPage({
               <p className="text-sm text-gray-500">No tracking information available</p>
             )}
           </div>
+          )}
           
-          {order.payment && (
+          {order.notes && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-6 shadow-sm">
+              <h2 className="text-lg font-medium text-amber-900 mb-2">Needs attention</h2>
+              <p className="text-sm text-amber-900">{order.notes}</p>
+            </div>
+          )}
+
+          {isShop && order.payments.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Payment Details</h2>
+              <div className="space-y-3 text-sm">
+                {order.payments.map((p) => (
+                  <div key={p.id} className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-gray-900">{p.method === "CASH" ? "Cash" : p.method === "UPI" ? "UPI" : "Card"}</p>
+                      {p.tendered != null && p.tendered > p.amount && (
+                        <p className="text-xs text-gray-500">Received ₹{p.tendered.toLocaleString("en-IN")}, change ₹{(p.tendered - p.amount).toLocaleString("en-IN")}</p>
+                      )}
+                      {p.reference && <p className="text-xs text-gray-500">Ref {p.reference}</p>}
+                    </div>
+                    <p className="font-medium text-gray-900">₹{p.amount.toLocaleString("en-IN")}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!isShop && order.payment && (
             <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Payment Details</h2>
               <div className="space-y-3 text-sm">

@@ -5,6 +5,7 @@ import { getRazorpay } from "@/lib/razorpay";
 import { MAX_QTY_PER_LINE, shippingFor } from "@/lib/pricing";
 import { sendOrderConfirmationEmail } from "@/lib/mail";
 import { revalidateCatalog } from "@/lib/cache";
+import { applyStockDeltas, type StockLine } from "@/lib/pos/stock";
 
 // ---------------------------------------------------------------------------
 // Input validation
@@ -326,31 +327,39 @@ export async function finalizePaidOrder(params: {
     const order = await tx.order.update({
       where: { id: payment.orderId },
       data: { status: "CONFIRMED" },
-      select: { couponCode: true, customerId: true, items: { select: { productId: true, variantId: true, quantity: true } } },
+      select: { couponCode: true, customerId: true, items: { select: { productId: true, variantId: true, quantity: true, name: true } } },
     });
 
-    for (const item of order.items) {
-      // Never let stock go negative. If two customers paid for the last unit
-      // at the same moment, clamp to zero and flag it for the admin.
-      if (item.variantId) {
-        const res = await tx.productVariant.updateMany({
-          where: { id: item.variantId, stock: { gte: item.quantity } },
-          data: { stock: { decrement: item.quantity } },
-        });
-        if (res.count === 0) {
-          await tx.productVariant.updateMany({ where: { id: item.variantId }, data: { stock: 0 } });
-          console.warn(`[payments] oversold variant ${item.variantId} on order ${payment.orderId}`);
+    // Take the stock (shared with the shop till) and write the stock history in the same step.
+    // Stock never goes negative: if the shop sold the last piece while the customer was paying,
+    // that item is emptied instead, and the order is flagged for the owner to refund or contact.
+    const lines: StockLine[] = order.items.flatMap((item): StockLine[] =>
+      item.variantId ? [{ variantId: item.variantId, delta: -item.quantity }] : item.productId ? [{ productId: item.productId, delta: -item.quantity }] : []
+    );
+    const stock = await applyStockDeltas(tx, lines, { reason: "ONLINE_SALE", orderId: payment.orderId });
+    if (stock.failed.length > 0) {
+      const wanted = new Map(order.items.map((i) => [i.variantId ?? i.productId, i.name] as const));
+      const short: string[] = [];
+      for (const line of stock.failed) {
+        const id = line.variantId ?? line.productId!;
+        // Empty whatever is left of the item and record that in the history.
+        const left = line.variantId
+          ? (await tx.productVariant.findUnique({ where: { id }, select: { stock: true } }))?.stock ?? 0
+          : (await tx.product.findUnique({ where: { id }, select: { stock: true } }))?.stock ?? 0;
+        if (left > 0) {
+          await applyStockDeltas(tx, [{ ...(line.variantId ? { variantId: id } : { productId: id }), delta: -left }], {
+            reason: "ONLINE_SALE",
+            orderId: payment.orderId,
+            note: "Paid online, but not enough was left; emptied",
+          });
         }
-      } else if (item.productId) {
-        const res = await tx.product.updateMany({
-          where: { id: item.productId, stock: { gte: item.quantity } },
-          data: { stock: { decrement: item.quantity } },
-        });
-        if (res.count === 0) {
-          await tx.product.updateMany({ where: { id: item.productId }, data: { stock: 0 } });
-          console.warn(`[payments] oversold product ${item.productId} on order ${payment.orderId}`);
-        }
+        short.push(wanted.get(id) ?? "an item");
       }
+      await tx.order.update({
+        where: { id: payment.orderId },
+        data: { notes: `Paid online, but not enough stock was left for: ${short.join(", ")}. Contact the customer or refund.` },
+      });
+      console.warn(`[payments] oversold on order ${payment.orderId}: ${short.join(", ")}`);
     }
 
     if (order.couponCode) {

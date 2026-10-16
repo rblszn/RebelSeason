@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { OrderStatus, Prisma } from "@prisma/client";
+import { OrderChannel, OrderStatus, Prisma } from "@prisma/client";
 
 export const orderInclude = {
   // Never select the whole user row here: these orders are passed to client
@@ -7,6 +7,9 @@ export const orderInclude = {
   customer: { select: { id: true, name: true, email: true, phone: true } },
   items: true,
   payment: true,
+  payments: true,
+  cashier: { select: { name: true, email: true } },
+  approvedBy: { select: { name: true, email: true } },
 } satisfies Prisma.OrderInclude;
 
 export type OrderWithRelations = Prisma.OrderGetPayload<{
@@ -18,17 +21,20 @@ export interface GetOrdersOptions {
   skip?: number;
   status?: OrderStatus;
   customerId?: string;
+  /** Website orders or shop (POS) bills. */
+  channel?: OrderChannel;
   /** Matches order number, customer name/email/phone or Razorpay payment/order id. */
   search?: string;
   orderBy?: Prisma.OrderOrderByWithRelationInput;
 }
 
 function orderWhere(options?: GetOrdersOptions): Prisma.OrderWhereInput {
-  const { status, customerId } = options || {};
+  const { status, customerId, channel } = options || {};
   const search = options?.search?.trim();
   return {
     ...(status ? { status } : {}),
     ...(customerId ? { customerId } : {}),
+    ...(channel ? { channel } : {}),
     ...(search
       ? {
           OR: [

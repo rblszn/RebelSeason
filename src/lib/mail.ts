@@ -280,3 +280,123 @@ export async function sendContactMessageEmail(msg: { name: string; email: string
     return false;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Shop (POS) bills and day-end summary
+// ---------------------------------------------------------------------------
+
+const inr = (n: number) => formatINR(n);
+
+/** Sends one email; with no mail credentials configured it logs instead (local development). */
+async function deliver(to: string, subject: string, html: string, label: string): Promise<void> {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+    console.log("[MOCK EMAIL] " + label + " -> " + to);
+    return;
+  }
+  await transporter.sendMail({ from: `"The Rebel Season" <${FROM_ADDRESS}>`, replyTo: siteConfig.supportEmail, to, subject, html });
+}
+
+export type PosBillEmail = {
+  billNumber: string;
+  createdAt: string;
+  customer: { name: string | null };
+  items: { name: string; size: string | null; quantity: number; unitPrice: number; unitMrp: number; lineTotal: number }[];
+  subtotal: number;
+  mrpSavings: number;
+  couponCode: string | null;
+  couponDiscount: number;
+  manualDiscount: number;
+  total: number;
+  payments: { method: string; amount: number }[];
+};
+
+export type PosStoreEmail = { storeName: string; address: string; phone: string; billFooter: string };
+
+function posBillHtml(bill: PosBillEmail, store: PosStoreEmail) {
+  const row = (label: string, value: string, opts: { bold?: boolean; color?: string } = {}) =>
+    '<tr><td style="padding: 5px 0; font-size: 14px; color: ' + (opts.color ?? '#444444') + (opts.bold ? '; font-weight: 700' : '') + ';">' + label + '</td>'
+    + '<td align="right" style="padding: 5px 0; font-size: 14px; color: ' + (opts.color ?? '#111111') + (opts.bold ? '; font-weight: 700' : '') + ';">' + value + '</td></tr>';
+
+  const items = bill.items.map((i) => {
+    const onSale = i.unitMrp > i.unitPrice;
+    const detail = (i.size ? 'Size ' + esc(i.size) + ' · ' : '')
+      + (onSale ? '<span style="text-decoration: line-through; color: #999999;">' + inr(i.unitMrp) + '</span> ' : '')
+      + inr(i.unitPrice) + ' × ' + i.quantity;
+    return '<tr><td style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;"><div style="font-weight: 600; color: #111111;">' + esc(i.name) + '</div>'
+      + '<div style="font-size: 13px; color: #666666;">' + detail + '</div></td>'
+      + '<td align="right" style="padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-weight: 500; color: #111111;">' + inr(i.lineTotal) + '</td></tr>';
+  }).join('');
+
+  const mrpTotal = bill.items.reduce((s, i) => s + i.unitMrp * i.quantity, 0);
+  const saved = bill.mrpSavings + bill.couponDiscount + bill.manualDiscount;
+  const date = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(bill.createdAt));
+  const name = esc(bill.customer.name?.split(' ')[0] || 'there');
+  const paidBy = bill.payments.map((p) => (p.method === 'CASH' ? 'Cash' : p.method === 'UPI' ? 'UPI' : 'Card') + ' ' + inr(p.amount)).join(' + ');
+
+  const summary = [
+    bill.mrpSavings > 0 ? row('Total at MRP', '<span style="text-decoration: line-through; color: #999999;">' + inr(mrpTotal) + '</span>') : '',
+    bill.mrpSavings > 0 ? row('Discount on MRP', '-' + inr(bill.mrpSavings), { color: '#16a34a' }) : '',
+    row('Subtotal', inr(bill.subtotal)),
+    bill.couponDiscount > 0 ? row('Coupon discount' + (bill.couponCode ? ' (' + esc(bill.couponCode) + ')' : ''), '-' + inr(bill.couponDiscount), { color: '#16a34a' }) : '',
+    bill.manualDiscount > 0 ? row('Discount given at the counter', '-' + inr(bill.manualDiscount), { color: '#16a34a' }) : '',
+    row('Total paid', inr(bill.total), { bold: true }),
+    row('Paid by', esc(paidBy)),
+  ].join('');
+
+  return wrapHtml(`
+    <h2 style="margin: 0 0 16px; font-size: 22px; color: #111111; text-align: center;">Thank you for shopping with us</h2>
+    <p style="margin: 0 0 20px; font-size: 15px; color: #444444; line-height: 1.5;">
+      Hi ${name}, here is your bill <strong style="color: #111111;">${esc(bill.billNumber)}</strong> from ${esc(store.storeName)} (${esc(date)}).
+    </p>
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 16px;">${items}</table>
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-top: 2px solid #111111; padding-top: 6px;">${summary}</table>
+    ${saved > 0 ? '<p style="margin: 12px 0 0; text-align: right; font-size: 13px; font-weight: 600; color: #16a34a;">You saved ' + inr(saved) + ' on this bill.</p>' : ''}
+    <p style="margin: 24px 0 0; font-size: 12px; color: #888888; line-height: 1.6;">${esc(store.billFooter)}<br>${esc(store.address)}${store.phone ? ' · ' + esc(store.phone) : ''}</p>
+  `);
+}
+
+/**
+ * Email a shop bill. Failures are logged and swallowed for the automatic send (email must never
+ * break billing); a manual resend (`resend: true`) throws so the counter can show the error.
+ */
+export async function sendPosBillEmail(to: string, bill: PosBillEmail, store: PosStoreEmail, options: { resend?: boolean } = {}): Promise<void> {
+  try {
+    await deliver(to, 'Your bill ' + bill.billNumber + ' from ' + store.storeName, posBillHtml(bill, store), 'Bill ' + bill.billNumber + ' ' + inr(bill.total));
+  } catch (error) {
+    console.error('Error sending shop bill email:', error);
+    if (options.resend) throw error;
+  }
+}
+
+/** Day-end summary to the owner when the register is closed. Never throws. */
+export async function sendDayCloseEmail(
+  to: string,
+  s: { openedAt: string; closedAt: string | null; billCount: number; cancelledCount: number; sales: number; discounts: number; cash: number; upi: number; card: number; openingCash: number; expectedCash: number; countedCash: number | null; difference: number | null; note: string | null; closedBy: string }
+): Promise<void> {
+  const row = (label: string, value: string) =>
+    '<tr><td style="padding: 5px 0; font-size: 14px; color: #444444;">' + label + '</td><td align="right" style="padding: 5px 0; font-size: 14px; color: #111111;">' + value + '</td></tr>';
+  const day = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' }).format(new Date(s.openedAt));
+  const diff = s.difference ?? 0;
+  const html = wrapHtml(`
+    <h2 style="margin: 0 0 16px; font-size: 22px; color: #111111;">Shop summary · ${esc(day)}</h2>
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-top: 1px solid #eeeeee; border-bottom: 1px solid #eeeeee; margin-bottom: 16px;">
+      ${row('Bills', s.billCount + (s.cancelledCount ? ' (+' + s.cancelledCount + ' cancelled)' : ''))}
+      ${row('<strong>Sales</strong>', '<strong>' + inr(s.sales) + '</strong>')}
+      ${row('Discounts given', inr(s.discounts))}
+      ${row('Cash', inr(s.cash))}${row('UPI', inr(s.upi))}${row('Card', inr(s.card))}
+    </table>
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-bottom: 1px solid #eeeeee;">
+      ${row('Opening cash', inr(s.openingCash))}
+      ${row('Expected in drawer', inr(s.expectedCash))}
+      ${row('Counted', s.countedCash === null ? '-' : inr(s.countedCash))}
+      ${row('Difference', diff === 0 ? 'None' : '<span style="color: ' + (diff < 0 ? '#b91c1c' : '#15803d') + ';">' + (diff > 0 ? '+' : '-') + ' ' + inr(Math.abs(diff)) + '</span>')}
+    </table>
+    ${s.note ? '<p style="font-size: 13px; color: #555555;">Note: ' + esc(s.note) + '</p>' : ''}
+    <p style="font-size: 12px; color: #888888;">Closed by ${esc(s.closedBy)}.</p>
+  `);
+  try {
+    await deliver(to, 'Shop summary ' + day + ': ' + inr(s.sales) + ' from ' + s.billCount + ' bill' + (s.billCount === 1 ? '' : 's'), html, 'Day close ' + day);
+  } catch (error) {
+    console.error('Error sending day-close email:', error);
+  }
+}

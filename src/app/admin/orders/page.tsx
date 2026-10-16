@@ -13,12 +13,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const resolvedParams = await searchParams;
   const page = Math.max(1, parseInt(resolvedParams.page || "1", 10) || 1);
   const search = (resolvedParams.q || "").trim().slice(0, 100);
+  // Website orders, shop bills (POS) or both.
+  const channel = resolvedParams.channel === "online" ? "ONLINE" : resolvedParams.channel === "shop" ? "POS" : undefined;
   const limit = 10;
   const skip = (page - 1) * limit;
 
   const [orders, total] = await Promise.all([
-    getAllOrders({ skip, limit, search }),
-    getOrdersCount({ search })
+    getAllOrders({ skip, limit, search, channel }),
+    getOrdersCount({ search, channel })
   ]);
   const totalPages = Math.ceil(total / limit);
 
@@ -45,12 +47,33 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">Orders</h1>
       </div>
 
+      <div className="flex gap-1 border-b border-gray-200">
+        {([
+          ["", "All"],
+          ["online", "Website"],
+          ["shop", "Shop"],
+        ] as const).map(([value, label]) => {
+          const active = (resolvedParams.channel ?? "") === value;
+          const href = `/admin/orders${value || search ? "?" : ""}${[value && `channel=${value}`, search && `q=${encodeURIComponent(search)}`].filter(Boolean).join("&")}`;
+          return (
+            <Link
+              key={value}
+              href={href}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${active ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+
       <form method="get" className="flex flex-col gap-2 sm:flex-row">
+        {resolvedParams.channel && <input type="hidden" name="channel" value={resolvedParams.channel} />}
         <input
           type="search"
           name="q"
           defaultValue={search}
-          placeholder="Search by order number (RS-…), customer name, email, phone or payment ID"
+          placeholder="Search by order or bill number, customer name, email, phone or payment ID"
           className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black"
         />
         <div className="flex gap-2">
@@ -58,7 +81,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             Search
           </button>
           {search && (
-            <Link href="/admin/orders" className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            <Link href={resolvedParams.channel ? `/admin/orders?channel=${resolvedParams.channel}` : "/admin/orders"} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
               Clear
             </Link>
           )}
@@ -90,6 +113,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     <Link href={`/admin/orders/${order.id}`} className="font-mono text-sm font-medium text-gray-900 hover:underline">
                       {order.orderNumber}
                     </Link>
+                    {order.channel === "POS" && (
+                      <span className="ml-2 rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">Shop</span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="text-sm text-gray-500">
@@ -98,7 +124,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="text-sm text-gray-900">{order.customerName}</div>
-                    <div className="text-sm text-gray-500">{order.customerEmail}</div>
+                    <div className="text-sm text-gray-500">{order.customerEmail || order.customerPhone}</div>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="text-sm font-medium text-gray-900">

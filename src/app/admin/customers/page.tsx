@@ -46,7 +46,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     <div className="text-sm font-medium text-gray-900">{customer.name}</div>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
-                    <div className="text-sm text-gray-900">{customer.email}</div>
+                    <div className="text-sm text-gray-900">{customer.email || <span className="text-gray-400">No email (shop customer)</span>}</div>
                     <div className="text-sm text-gray-500">{customer.phone || "No phone"}</div>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">

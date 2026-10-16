@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, FolderTree, ShoppingBag, Users, Store, ShieldCheck, X, ExternalLink, Tag } from "lucide-react";
+import { LayoutDashboard, Package, FolderTree, ShoppingBag, Users, Store, ShieldCheck, X, ExternalLink, Tag, ScanBarcode, UserCog, History, Settings2, BarChart3 } from "lucide-react";
 
 interface AdminSidebarProps {
   mobileOpen?: boolean;
@@ -52,6 +52,14 @@ const navItems = [
     icon: Store,
     exact: false,
   },
+];
+
+// The in-store billing counter and what supports it.
+const posItems = [
+  { name: "Reports", href: "/admin/reports", icon: BarChart3, exact: false },
+  { name: "Stock history", href: "/admin/stock", icon: History, exact: false },
+  { name: "Staff & devices", href: "/admin/staff", icon: UserCog, exact: false },
+  { name: "POS settings", href: "/admin/pos-settings", icon: Settings2, exact: false },
 ];
 
 export function AdminSidebar({ mobileOpen = false, onClose }: AdminSidebarProps) {
@@ -128,6 +136,39 @@ export function AdminSidebar({ mobileOpen = false, onClose }: AdminSidebarProps)
                 </Link>
               );
             })}
+          </nav>
+
+          <p className="px-3 pb-2 pt-6 text-[11px] font-semibold uppercase tracking-wider text-gray-600">
+            Shop POS
+          </p>
+          <nav className="space-y-1">
+            {posItems.map((item) => {
+              const active = isItemActive(item.href, item.exact);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onClose}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    active ? "bg-gray-900 text-white shadow-xs" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  }`}
+                >
+                  <Icon className={`h-4 w-4 shrink-0 ${active ? "text-white" : "text-gray-600"}`} />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+            <Link
+              href="/pos"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+            >
+              <ScanBarcode className="h-4 w-4 shrink-0 text-gray-600" />
+              <span>Open the POS</span>
+              <ExternalLink className="ml-auto h-3.5 w-3.5 text-gray-400" />
+            </Link>
           </nav>
         </div>
       </div>

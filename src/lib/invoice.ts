@@ -24,9 +24,14 @@ export interface InvoiceOrder {
   items: { id?: string; name: string; variantName?: string | null; quantity: number; price: number; mrp?: number | null }[];
   subtotal: number;
   discount: number;
+  manualDiscount?: number;
   shipping: number;
   total: number;
   couponCode?: string | null;
+  /** Shop bills: where and how it was paid. */
+  channel?: string;
+  payments?: { method: string; amount: number; tendered?: number | null; reference?: string | null }[];
+  cashier?: { name: string | null; email: string | null } | null;
   payment?: {
     method: string;
     status: string;
@@ -69,6 +74,7 @@ export function renderInvoiceHtml(order: InvoiceOrder, options: { autoPrint?: bo
     bill.couponDiscount > 0
       ? `<tr class="save"><td>Coupon discount${bill.couponCode ? ` (${esc(bill.couponCode)})` : ""}</td><td class="right">-${formatINR(bill.couponDiscount)}</td></tr>`
       : "",
+    bill.manualDiscount > 0 ? `<tr class="save"><td>Discount at the counter</td><td class="right">-${formatINR(bill.manualDiscount)}</td></tr>` : "",
     `<tr><td>Shipping</td><td class="right">${bill.shipping === 0 ? "Free" : formatINR(bill.shipping)}</td></tr>`,
     `<tr class="grand"><td>Total</td><td class="right">${formatINR(bill.total)}</td></tr>`,
   ].join("");
@@ -78,8 +84,13 @@ export function renderInvoiceHtml(order: InvoiceOrder, options: { autoPrint?: bo
       ? `<p class="saved">You saved ${formatINR(bill.totalSavings)} on this order.</p>`
       : "";
 
-  const paymentMethod = order.payment ? (order.payment.method === "COD" ? "Cash on delivery" : "Online payment") : "-";
-  const paymentStatus = order.payment ? PAYMENT_LABELS[order.payment.status] ?? order.payment.status : "-";
+  const isShop = order.channel === "POS";
+  const SHOP_METHODS: Record<string, string> = { CASH: "Cash", UPI: "UPI", CARD: "Card" };
+  const shopPayments = (order.payments ?? [])
+    .map((p) => `${SHOP_METHODS[p.method] ?? p.method} ${formatINR(p.amount)}${p.reference ? ` (ref ${esc(p.reference)})` : ""}`)
+    .join(" + ");
+  const paymentMethod = isShop ? shopPayments || "-" : order.payment ? (order.payment.method === "COD" ? "Cash on delivery" : "Online payment") : "-";
+  const paymentStatus = isShop ? (order.payments?.length ? "Paid" : "-") : order.payment ? PAYMENT_LABELS[order.payment.status] ?? order.payment.status : "-";
 
   return `<!doctype html>
 <html lang="en">
@@ -140,7 +151,8 @@ export function renderInvoiceHtml(order: InvoiceOrder, options: { autoPrint?: bo
       <h2>Invoice</h2>
       <p><strong>${esc(order.orderNumber)}</strong></p>
       <p class="muted">Date: ${esc(date)}</p>
-      <p class="muted">Payment: ${esc(paymentStatus)} (${esc(paymentMethod)})</p>
+      <p class="muted">Payment: ${esc(paymentStatus)} (${isShop ? paymentMethod : esc(paymentMethod)})</p>
+      ${isShop && order.cashier ? `<p class="muted">Served by: ${esc(order.cashier.name || order.cashier.email)}</p>` : ""}
       ${order.payment?.razorpayPaymentId ? `<p class="muted">Payment ID: ${esc(order.payment.razorpayPaymentId)}</p>` : ""}
     </div>
   </header>
@@ -153,7 +165,7 @@ export function renderInvoiceHtml(order: InvoiceOrder, options: { autoPrint?: bo
       ${order.customerPhone ? `<p>${esc(order.customerPhone)}</p>` : ""}
     </div>
     <div>
-      <h2>Shipped to</h2>
+      <h2>${isShop ? "Bought at" : "Shipped to"}</h2>
       ${
         address
           ? `<p><strong>${esc(address.name || order.customerName)}</strong></p>
